@@ -1,0 +1,16 @@
+{
+  "curvature": 0.04,
+  "rasterStrength": 0.45,
+  "chroma": 0.2483,
+  "tint": [1.0, 0.505, 0.0],
+  "brightness": 0.65,
+  "ambient": 0.04,
+  "flicker": 0.1,
+  "persistence": 0.4,
+  "rasterMode": 0,
+  "horizontalSync": 0.01,
+  "glowingLine": 0.04,
+  "staticNoise": 0.1198,
+  "jitter": 0.015,
+  "rgbShift": 0.0
+}
