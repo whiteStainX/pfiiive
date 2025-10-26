@@ -64,10 +64,31 @@ async function main() {
     return fb;
   }
 
+  function loadTexture(gl, url) {
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255])); // 1x1 black pixel
+
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        resolve(tex);
+      };
+      img.src = url;
+    });
+  }
+
   // --- Fetch and build pipeline ---
-  const [vsSrc, fsSrc] = await Promise.all([
+  const [vsSrc, fsSrc, noiseTex] = await Promise.all([
     fetch('shaders/crt.vert').then(res => res.text()),
     fetch('shaders/crt.frag').then(res => res.text()),
+    loadTexture(gl, 'assets/images/allNoise512.png'),
   ]);
 
   const program = programFromSources(gl, vsSrc, fsSrc);
@@ -78,10 +99,12 @@ async function main() {
   const u = {
     uTex: gl.getUniformLocation(program, 'uTex'),
     uPrevTex: gl.getUniformLocation(program, 'uPrevTex'),
+    uNoiseTex: gl.getUniformLocation(program, 'uNoiseTex'),
     uResolution: gl.getUniformLocation(program, 'uResolution'),
     uTime: gl.getUniformLocation(program, 'uTime'),
     uDPR: gl.getUniformLocation(program, 'uDPR'),
     uVirtRes: gl.getUniformLocation(program, 'uVirtRes'),
+    uNoiseScale: gl.getUniformLocation(program, 'uNoiseScale'),
     uCurvature: gl.getUniformLocation(program, 'uCurvature'),
     uRasterStrength: gl.getUniformLocation(program, 'uRasterStrength'),
     uChroma: gl.getUniformLocation(program, 'uChroma'),
@@ -93,7 +116,10 @@ async function main() {
     uRasterMode: gl.getUniformLocation(program, 'uRasterMode'),
     uHorizontalSync: gl.getUniformLocation(program, 'uHorizontalSync'),
     uGlowingLine: gl.getUniformLocation(program, 'uGlowingLine'),
-    uStaticNoise: gl.getUniformLocation(program, 'uStaticNoise'),
+        uStaticNoise:   gl.getUniformLocation(program, 'uStaticNoise'),
+        uJitter:        gl.getUniformLocation(program, 'uJitter'),
+    uRgbShift:      gl.getUniformLocation(program, 'uRgbShift'),
+    uDeltaTime:     gl.getUniformLocation(program, 'uDeltaTime'),
   };
 
   // State
@@ -131,25 +157,66 @@ async function main() {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
   const params = {
-    curvature: 0.10,
-    rasterStrength: 0.45,
-    chroma: 1.0,
-    tint: [1.0, 1.0, 1.0],
-    brightness: 1.0,
-    ambient: 0.05,
-    flicker: 0.01,
-    persistence: 0.04,
+    // The slider value (0-1) is multiplied by 0.4. Effective range: 0.0 to 0.4.
+    curvature: 0.3 * 0.4,
+
+    // Strength of the rasterization effect (scanlines, etc.). Range: 0.0 to 1.0.
+    rasterStrength: 0.45, // This is a good default, not explicitly in profile.
+
+    // 0.0 for monochrome, 1.0 for full color. Default Amber is low color.
+    chroma: 0.2483,
+
+    // The color tint. Default Amber is #ff8100.
+    tint: [1.0, 0.505, 0.0],
+
+    // Final brightness multiplier. Range: 0.0 to 2.0 (approx).
+    brightness: 0.5,
+
+    // The slider value (0-1) is multiplied by 0.2. Effective range: 0.0 to 0.2.
+    ambient: 0.2 * 0.2,
+
+    // Flicker intensity. Range: 0.0 to 1.0.
+    flicker: 0.1,
+
+    // Fade time in seconds. Higher value = longer trail.
+    persistence: 0.4, // Approximates the feel of the original's default burnIn value.
+
+    // 0: scanlines, 1: subpixels, 2: pixel cells.
     rasterMode: 0,
-    horizontalSync: 0.1,
-    glowingLine: 0.1,
-    staticNoise: 0.05,
+
+    // The slider value (0-1) is mapped to the range 0.05 to 0.35.
+    horizontalSync: 0.08, // This is the raw value from the profile.
+
+    // The slider value (0-1) is multiplied by 0.2. Effective range: 0.0 to 0.2.
+    glowingLine: 0.2 * 0.2,
+
+    // Static noise intensity. Range: 0.0 to 1.0.
+    staticNoise: 0.1198,
+
+    // Jitter intensity. Range: 0.0 to 1.0.
+    jitter: 0.1997,
+
+    // Chromatic aberration amount. Range: 0.0 to 1.0.
+    rgbShift: 0.0,
   };
 
-  resize();
+      resize();
 
-  let start = performance.now();
-  function frame(now) {
-    const p5Canvas = window.getP5Canvas && window.getP5Canvas();
+    
+
+      const start = performance.now();
+
+      let lastTime = start;
+
+      function frame(now) {
+
+        const deltaTime = (now - lastTime) * 0.001; // seconds
+
+        lastTime = now;
+
+    
+
+        const p5Canvas = window.getP5Canvas && window.getP5Canvas();
     const p5Size = window.getP5Size ? window.getP5Size() : { w: 640, h: 400 };
 
     if (p5Canvas) {
@@ -172,9 +239,19 @@ async function main() {
     gl.bindTexture(gl.TEXTURE_2D, prevTex);
     gl.uniform1i(u.uPrevTex, 1);
 
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, noiseTex);
+    gl.uniform1i(u.uNoiseTex, 2);
+
     gl.uniform2f(u.uResolution, skin.width, skin.height);
     gl.uniform1f(u.uTime, (now - start) * 0.001);
+    gl.uniform1f(u.uDeltaTime, deltaTime);
     gl.uniform1f(u.uDPR, DPR);
+
+    // Match noise texture tiling from original
+    const noiseW = 512;
+    const noiseH = 512;
+    gl.uniform2f(u.uNoiseScale, skin.width * 0.75 / noiseW, skin.height * 0.75 / noiseH);
 
     gl.uniform2f(u.uVirtRes, skin.width / DPR, skin.height / DPR);
 
@@ -190,6 +267,8 @@ async function main() {
     gl.uniform1f(u.uHorizontalSync, params.horizontalSync);
     gl.uniform1f(u.uGlowingLine, params.glowingLine);
     gl.uniform1f(u.uStaticNoise, params.staticNoise);
+    gl.uniform1f(u.uJitter, params.jitter);
+    gl.uniform1f(u.uRgbShift, params.rgbShift);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
@@ -206,6 +285,7 @@ async function main() {
   requestAnimationFrame(frame);
 
   window.CRTParams = {
+    setRgbShift: (s) => params.rgbShift = s,
     setRasterMode: (m) => params.rasterMode = m | 0,
     setTint: (r, g, b) => { params.tint = [r, g, b]; },
     amber: () => { params.tint = [1.0, 0.73, 0.2]; params.chroma = 0.35; },
