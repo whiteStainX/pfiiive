@@ -26,6 +26,7 @@ This section details the features that have been successfully implemented and ve
 - [x] **Authentic Persistence**: Re-implemented the persistence/burn-in effect to use a `max()` blend with subtractive, time-based decay, closely matching the original's behavior.
 - [x] **RGB Shift**: Implemented chromatic aberration effect that separates the R, G, and B channels.
 - [x] **Parameterization**: Default values and effect ranges have been calibrated to match the original "Default Amber" profile from `cool-retro-term`.
+- [x] **Bloom Glow**: Added a dedicated brightness extraction + blur + composite pass to create a soft halo around bright pixels.
 
 ---
 
@@ -33,20 +34,13 @@ This section details the features that have been successfully implemented and ve
 
 While the core look is nearly complete, the following tasks remain to finish the project.
 
-1.  **Implement Bloom Effect**
-    *   The current `ambientLight` is a simple vignette. A true bloom effect requires a more complex implementation:
-        1.  **Extract Brightness**: Create a separate render pass that extracts the brightest parts of the source image into a new texture.
-        2.  **Downsample & Blur**: Downsample the brightness texture and apply a multi-pass Gaussian blur to create a soft, glowing halo.
-        3.  **Additive Blend**: Add the blurred texture back onto the final rendered image.
-    *   This is the last major visual effect remaining for full fidelity.
-
-2.  **Build a User Interface**
+1.  **Build a User Interface**
     *   Create a simple UI panel (e.g., using `dat.GUI` or a simple HTML form) to control all the exposed shader parameters in `js/skin.js`.
     *   This will allow for real-time tweaking of the effects without using the developer console.
 
-3.  **Add Support for More Input Sources**
+2.  **Add Support for More Input Sources**
     *   Modify the `skin.js` and `index.html` to allow the CRT skin to be applied to other sources, such as a `<video>` element or a user-uploaded image, in addition to the p5.js canvas.
 
-4.  **Code Cleanup & Optimization**
+3.  **Code Cleanup & Optimization**
     *   Review the code for any potential optimizations.
     *   Consider moving the vertex shader calculations for `flicker` and `horizontalSync` (as seen in the original) if performance becomes a concern.

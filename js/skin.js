@@ -85,42 +85,76 @@ async function main() {
   }
 
   // --- Fetch and build pipeline ---
-  const [vsSrc, fsSrc, noiseTex, params] = await Promise.all([
+  const [
+    vsSrc,
+    fsSrc,
+    bloomExtractSrc,
+    bloomBlurSrc,
+    bloomCompositeSrc,
+    noiseTex,
+    params
+  ] = await Promise.all([
     fetch('shaders/crt.vert').then(res => res.text()),
     fetch('shaders/crt.frag').then(res => res.text()),
+    fetch('shaders/bloom_extract.frag').then(res => res.text()),
+    fetch('shaders/bloom_blur.frag').then(res => res.text()),
+    fetch('shaders/bloom_composite.frag').then(res => res.text()),
     loadTexture(gl, 'assets/images/allNoise512.png'),
     fetch('config.json').then(res => res.json()),
   ]);
 
-  const program = programFromSources(gl, vsSrc, fsSrc);
+  const crtProgram = programFromSources(gl, vsSrc, fsSrc);
+  const bloomExtractProgram = programFromSources(gl, vsSrc, bloomExtractSrc);
+  const bloomBlurProgram = programFromSources(gl, vsSrc, bloomBlurSrc);
+  const bloomCompositeProgram = programFromSources(gl, vsSrc, bloomCompositeSrc);
   const vao = makeFullscreenVAO(gl);
-  gl.useProgram(program);
+  gl.useProgram(crtProgram);
 
   // Uniform locations
-  const u = {
-    uTex: gl.getUniformLocation(program, 'uTex'),
-    uPrevTex: gl.getUniformLocation(program, 'uPrevTex'),
-    uNoiseTex: gl.getUniformLocation(program, 'uNoiseTex'),
-    uResolution: gl.getUniformLocation(program, 'uResolution'),
-    uTime: gl.getUniformLocation(program, 'uTime'),
-    uDPR: gl.getUniformLocation(program, 'uDPR'),
-    uVirtRes: gl.getUniformLocation(program, 'uVirtRes'),
-    uNoiseScale: gl.getUniformLocation(program, 'uNoiseScale'),
-    uCurvature: gl.getUniformLocation(program, 'uCurvature'),
-    uRasterStrength: gl.getUniformLocation(program, 'uRasterStrength'),
-    uChroma: gl.getUniformLocation(program, 'uChroma'),
-    uTint: gl.getUniformLocation(program, 'uTint'),
-    uBrightness: gl.getUniformLocation(program, 'uBrightness'),
-    uAmbient: gl.getUniformLocation(program, 'uAmbient'),
-    uFlicker: gl.getUniformLocation(program, 'uFlicker'),
-    uPersistence: gl.getUniformLocation(program, 'uPersistence'),
-    uRasterMode: gl.getUniformLocation(program, 'uRasterMode'),
-    uHorizontalSync: gl.getUniformLocation(program, 'uHorizontalSync'),
-    uGlowingLine: gl.getUniformLocation(program, 'uGlowingLine'),
-        uStaticNoise:   gl.getUniformLocation(program, 'uStaticNoise'),
-        uJitter:        gl.getUniformLocation(program, 'uJitter'),
-    uRgbShift:      gl.getUniformLocation(program, 'uRgbShift'),
-    uDeltaTime:     gl.getUniformLocation(program, 'uDeltaTime'),
+  const crtUniforms = {
+    uTex: gl.getUniformLocation(crtProgram, 'uTex'),
+    uPrevTex: gl.getUniformLocation(crtProgram, 'uPrevTex'),
+    uNoiseTex: gl.getUniformLocation(crtProgram, 'uNoiseTex'),
+    uResolution: gl.getUniformLocation(crtProgram, 'uResolution'),
+    uTime: gl.getUniformLocation(crtProgram, 'uTime'),
+    uDPR: gl.getUniformLocation(crtProgram, 'uDPR'),
+    uVirtRes: gl.getUniformLocation(crtProgram, 'uVirtRes'),
+    uNoiseScale: gl.getUniformLocation(crtProgram, 'uNoiseScale'),
+    uCurvature: gl.getUniformLocation(crtProgram, 'uCurvature'),
+    uRasterStrength: gl.getUniformLocation(crtProgram, 'uRasterStrength'),
+    uChroma: gl.getUniformLocation(crtProgram, 'uChroma'),
+    uTint: gl.getUniformLocation(crtProgram, 'uTint'),
+    uBrightness: gl.getUniformLocation(crtProgram, 'uBrightness'),
+    uAmbient: gl.getUniformLocation(crtProgram, 'uAmbient'),
+    uFlicker: gl.getUniformLocation(crtProgram, 'uFlicker'),
+    uPersistence: gl.getUniformLocation(crtProgram, 'uPersistence'),
+    uRasterMode: gl.getUniformLocation(crtProgram, 'uRasterMode'),
+    uHorizontalSync: gl.getUniformLocation(crtProgram, 'uHorizontalSync'),
+    uGlowingLine: gl.getUniformLocation(crtProgram, 'uGlowingLine'),
+    uStaticNoise: gl.getUniformLocation(crtProgram, 'uStaticNoise'),
+    uJitter: gl.getUniformLocation(crtProgram, 'uJitter'),
+    uRgbShift: gl.getUniformLocation(crtProgram, 'uRgbShift'),
+    uDeltaTime: gl.getUniformLocation(crtProgram, 'uDeltaTime'),
+  };
+
+  const bloomUniforms = {
+    extract: {
+      uScene: gl.getUniformLocation(bloomExtractProgram, 'uScene'),
+      uThreshold: gl.getUniformLocation(bloomExtractProgram, 'uThreshold'),
+      uSoftKnee: gl.getUniformLocation(bloomExtractProgram, 'uSoftKnee'),
+    },
+    blur: {
+      uInput: gl.getUniformLocation(bloomBlurProgram, 'uInput'),
+      uTexelSize: gl.getUniformLocation(bloomBlurProgram, 'uTexelSize'),
+      uDirection: gl.getUniformLocation(bloomBlurProgram, 'uDirection'),
+      uRadius: gl.getUniformLocation(bloomBlurProgram, 'uRadius'),
+    },
+    composite: {
+      uScene: gl.getUniformLocation(bloomCompositeProgram, 'uScene'),
+      uBloom: gl.getUniformLocation(bloomCompositeProgram, 'uBloom'),
+      uBloomIntensity: gl.getUniformLocation(bloomCompositeProgram, 'uBloomIntensity'),
+      uBloomAlphaScale: gl.getUniformLocation(bloomCompositeProgram, 'uBloomAlphaScale'),
+    },
   };
 
   // State
@@ -146,12 +180,27 @@ async function main() {
     ping.texA = createRenderTexture(gl, skin.width, skin.height);
     ping.texB = createRenderTexture(gl, skin.width, skin.height);
     ping.fbA = createFramebuffer(gl, ping.texA);
-    ping.fbB = createFramebuffer(gl, ping.fbB);
+    ping.fbB = createFramebuffer(gl, ping.texB);
+
+    if (bloom.texA) {
+      gl.deleteTexture(bloom.texA);
+      gl.deleteTexture(bloom.texB);
+      gl.deleteFramebuffer(bloom.fbA);
+      gl.deleteFramebuffer(bloom.fbB);
+    }
+    const bloomScale = Math.max(0.05, Math.min(1.0, params.bloomResolutionScale || 0.5));
+    bloom.width = Math.max(1, Math.floor(skin.width * bloomScale));
+    bloom.height = Math.max(1, Math.floor(skin.height * bloomScale));
+    bloom.texA = createRenderTexture(gl, bloom.width, bloom.height);
+    bloom.texB = createRenderTexture(gl, bloom.width, bloom.height);
+    bloom.fbA = createFramebuffer(gl, bloom.texA);
+    bloom.fbB = createFramebuffer(gl, bloom.texB);
     isResizing = false;
   }
   window.addEventListener('resize', resize);
 
   const ping = { texA: null, texB: null, fbA: null, fbB: null, flip: false };
+  const bloom = { texA: null, texB: null, fbA: null, fbB: null, width: 0, height: 0 };
 
   const srcTex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, srcTex);
@@ -160,30 +209,21 @@ async function main() {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
+  resize();
 
+  const start = performance.now();
+  let lastTime = start;
 
-      resize();
-
-    
-
-      const start = performance.now();
-
-      let lastTime = start;
-
-      function frame(now) {
+  function frame(now) {
     if (isResizing) {
       requestAnimationFrame(frame);
       return;
     }
 
-        const deltaTime = (now - lastTime) * 0.001; // seconds
+    const deltaTime = (now - lastTime) * 0.001; // seconds
+    lastTime = now;
 
-        lastTime = now;
-
-    
-
-        const p5Canvas = window.getP5Canvas && window.getP5Canvas();
-    const p5Size = window.getP5Size ? window.getP5Size() : { w: 640, h: 400 };
+    const p5Canvas = window.getP5Canvas && window.getP5Canvas();
 
     if (p5Canvas) {
       gl.activeTexture(gl.TEXTURE0);
@@ -193,58 +233,107 @@ async function main() {
     }
 
     const prevTex = ping.flip ? ping.texB : ping.texA;
+    const currTex = ping.flip ? ping.texA : ping.texB;
     const currFB = ping.flip ? ping.fbA : ping.fbB;
     ping.flip = !ping.flip;
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, currFB);
-    gl.useProgram(program);
+    gl.viewport(0, 0, skin.width, skin.height);
+    gl.useProgram(crtProgram);
     gl.bindVertexArray(vao);
 
-    gl.uniform1i(u.uTex, 0);
+    gl.uniform1i(crtUniforms.uTex, 0);
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, prevTex);
-    gl.uniform1i(u.uPrevTex, 1);
+    gl.uniform1i(crtUniforms.uPrevTex, 1);
 
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, noiseTex);
-    gl.uniform1i(u.uNoiseTex, 2);
+    gl.uniform1i(crtUniforms.uNoiseTex, 2);
 
-    gl.uniform2f(u.uResolution, skin.width, skin.height);
-    gl.uniform1f(u.uTime, (now - start) * 0.001);
-    gl.uniform1f(u.uDeltaTime, deltaTime);
-    gl.uniform1f(u.uDPR, DPR);
+    gl.uniform2f(crtUniforms.uResolution, skin.width, skin.height);
+    gl.uniform1f(crtUniforms.uTime, (now - start) * 0.001);
+    gl.uniform1f(crtUniforms.uDeltaTime, deltaTime);
+    gl.uniform1f(crtUniforms.uDPR, DPR);
 
     // Match noise texture tiling from original
     const noiseW = 512;
     const noiseH = 512;
-    gl.uniform2f(u.uNoiseScale, skin.width * 0.75 / noiseW, skin.height * 0.75 / noiseH);
+    gl.uniform2f(crtUniforms.uNoiseScale, skin.width * 0.75 / noiseW, skin.height * 0.75 / noiseH);
 
-    gl.uniform2f(u.uVirtRes, skin.width / DPR, skin.height / DPR);
+    gl.uniform2f(crtUniforms.uVirtRes, skin.width / DPR, skin.height / DPR);
 
-    gl.uniform1f(u.uCurvature, params.curvature);
-    gl.uniform1f(u.uRasterStrength, params.rasterStrength);
-    gl.uniform1f(u.uChroma, params.chroma);
-    gl.uniform3f(u.uTint, params.tint[0], params.tint[1], params.tint[2]);
-    gl.uniform1f(u.uBrightness, params.brightness);
-    gl.uniform1f(u.uAmbient, params.ambient);
-    gl.uniform1f(u.uFlicker, params.flicker);
-    gl.uniform1f(u.uPersistence, params.persistence);
-    gl.uniform1i(u.uRasterMode, params.rasterMode);
-    gl.uniform1f(u.uHorizontalSync, params.horizontalSync);
-    gl.uniform1f(u.uGlowingLine, params.glowingLine);
-    gl.uniform1f(u.uStaticNoise, params.staticNoise);
-    gl.uniform1f(u.uJitter, params.jitter);
-    gl.uniform1f(u.uRgbShift, params.rgbShift);
+    gl.uniform1f(crtUniforms.uCurvature, params.curvature);
+    gl.uniform1f(crtUniforms.uRasterStrength, params.rasterStrength);
+    gl.uniform1f(crtUniforms.uChroma, params.chroma);
+    gl.uniform3f(crtUniforms.uTint, params.tint[0], params.tint[1], params.tint[2]);
+    gl.uniform1f(crtUniforms.uBrightness, params.brightness);
+    gl.uniform1f(crtUniforms.uAmbient, params.ambient);
+    gl.uniform1f(crtUniforms.uFlicker, params.flicker);
+    gl.uniform1f(crtUniforms.uPersistence, params.persistence);
+    gl.uniform1i(crtUniforms.uRasterMode, params.rasterMode);
+    gl.uniform1f(crtUniforms.uHorizontalSync, params.horizontalSync);
+    gl.uniform1f(crtUniforms.uGlowingLine, params.glowingLine);
+    gl.uniform1f(crtUniforms.uStaticNoise, params.staticNoise);
+    gl.uniform1f(crtUniforms.uJitter, params.jitter);
+    gl.uniform1f(crtUniforms.uRgbShift, params.rgbShift);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, srcTex);
+    gl.uniform1i(crtUniforms.uTex, 0);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, currFB);
-    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
-    gl.blitFramebuffer(
-      0, 0, skin.width, skin.height,
-      0, 0, skin.width, skin.height,
-      gl.COLOR_BUFFER_BIT, gl.NEAREST
-    );
+    let bloomTexture = bloom.texA;
+    const bloomEnabled = params.bloomIntensity > 0.0 && bloom.width > 0 && bloom.height > 0;
+
+    if (bloomEnabled) {
+      gl.viewport(0, 0, bloom.width, bloom.height);
+      gl.useProgram(bloomExtractProgram);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, bloom.fbA);
+      gl.bindVertexArray(vao);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, currTex);
+      gl.uniform1i(bloomUniforms.extract.uScene, 0);
+      gl.uniform1f(bloomUniforms.extract.uThreshold, params.bloomThreshold);
+      gl.uniform1f(bloomUniforms.extract.uSoftKnee, params.bloomSoftKnee);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      gl.useProgram(bloomBlurProgram);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, bloom.fbB);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, bloom.texA);
+      gl.uniform1i(bloomUniforms.blur.uInput, 0);
+      gl.uniform2f(bloomUniforms.blur.uTexelSize, 1.0 / bloom.width, 1.0 / bloom.height);
+      gl.uniform2f(bloomUniforms.blur.uDirection, 1.0, 0.0);
+      gl.uniform1f(bloomUniforms.blur.uRadius, params.bloomRadius);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      gl.bindFramebuffer(gl.FRAMEBUFFER, bloom.fbA);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, bloom.texB);
+      gl.uniform1i(bloomUniforms.blur.uInput, 0);
+      gl.uniform2f(bloomUniforms.blur.uTexelSize, 1.0 / bloom.width, 1.0 / bloom.height);
+      gl.uniform2f(bloomUniforms.blur.uDirection, 0.0, 1.0);
+      gl.uniform1f(bloomUniforms.blur.uRadius, params.bloomRadius);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+      bloomTexture = bloom.texA;
+    }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, skin.width, skin.height);
+    gl.useProgram(bloomCompositeProgram);
+    gl.bindVertexArray(vao);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, currTex);
+    gl.uniform1i(bloomUniforms.composite.uScene, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, bloomTexture || currTex);
+    gl.uniform1i(bloomUniforms.composite.uBloom, 1);
+    gl.uniform1f(bloomUniforms.composite.uBloomIntensity, params.bloomIntensity);
+    gl.uniform1f(bloomUniforms.composite.uBloomAlphaScale, params.bloomAlphaScale || 1.0);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
 
     requestAnimationFrame(frame);
   }
@@ -257,6 +346,14 @@ async function main() {
     amber: () => { params.tint = [1.0, 0.73, 0.2]; params.chroma = 0.35; },
     green: () => { params.tint = [0.65, 1.0, 0.65]; params.chroma = 0.35; },
     rgb: () => { params.tint = [1.0, 1.0, 1.0]; params.chroma = 1.0; },
+    setBloomIntensity: (v) => { params.bloomIntensity = Math.max(0, v); },
+    setBloomThreshold: (v) => { params.bloomThreshold = v; },
+    setBloomRadius: (v) => { params.bloomRadius = v; },
+    setBloomSoftKnee: (v) => { params.bloomSoftKnee = v; },
+    setBloomResolutionScale: (v) => {
+      params.bloomResolutionScale = Math.max(0.05, Math.min(1.0, v));
+      resize();
+    },
   };
 
   window.getDisplayAspectRatio = () => window.innerWidth / window.innerHeight;
