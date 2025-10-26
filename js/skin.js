@@ -158,7 +158,7 @@ async function main() {
 
   const params = {
     // The slider value (0-1) is multiplied by 0.4. Effective range: 0.0 to 0.4.
-    curvature: 0.3 * 0.4,
+    curvature: 0.1 * 0.4, // Further reduced
 
     // Strength of the rasterization effect (scanlines, etc.). Range: 0.0 to 1.0.
     rasterStrength: 0.45, // This is a good default, not explicitly in profile.
@@ -170,7 +170,7 @@ async function main() {
     tint: [1.0, 0.505, 0.0],
 
     // Final brightness multiplier. Range: 0.0 to 2.0 (approx).
-    brightness: 0.5,
+    brightness: 0.65, // Increased for a brighter image
 
     // The slider value (0-1) is multiplied by 0.2. Effective range: 0.0 to 0.2.
     ambient: 0.2 * 0.2,
@@ -185,7 +185,7 @@ async function main() {
     rasterMode: 0,
 
     // The slider value (0-1) is mapped to the range 0.05 to 0.35.
-    horizontalSync: 0.08, // This is the raw value from the profile.
+    horizontalSync: 0.01, // Further reduced
 
     // The slider value (0-1) is multiplied by 0.2. Effective range: 0.0 to 0.2.
     glowingLine: 0.2 * 0.2,
@@ -194,7 +194,7 @@ async function main() {
     staticNoise: 0.1198,
 
     // Jitter intensity. Range: 0.0 to 1.0.
-    jitter: 0.1997,
+    jitter: 0.015, // Further reduced
 
     // Chromatic aberration amount. Range: 0.0 to 1.0.
     rgbShift: 0.0,

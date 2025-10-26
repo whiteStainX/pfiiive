@@ -7,35 +7,44 @@
 
   new p5((p) => {
     p.setup = () => {
-      p.pixelDensity(1); // control DPR in WebGL layer
-      gfx = p.createGraphics(w, h); // 2D context
+      p.pixelDensity(1);
+      gfx = p.createGraphics(w, h);
       gfx.pixelDensity(1);
-      p.createCanvas(1,1); // tiny main canvas; we won't display it
-      p.noLoop(); // main p5 canvas not used
+      p.createCanvas(1,1);
+      p.noLoop();
     };
-
     p.draw = () => { /* not used */ };
   });
 
-  // Simple animation loop for gfx itself (no p5 draw loop required)
+  // Lissajous curve animation
   function drawGfx(){
     if (!gfx) { requestAnimationFrame(drawGfx); return; }
-    const t = performance.now() * 0.001;
+    const t = performance.now() * 0.0002;
+
     gfx.push();
     gfx.clear();
     gfx.background(8, 10, 14);
 
-    // Static circle that pulses slightly
-    gfx.noStroke();
-    gfx.fill(240, 250, 255);
-    const r = 60 + Math.sin(t*2.0) * 6.0;
-    gfx.circle(gfx.width/2, gfx.height/2, r);
+    gfx.translate(w / 2, h / 2);
+    gfx.stroke(255, 200, 150); // Amber-like color
+    gfx.strokeWeight(1.5);
+    gfx.noFill();
 
-    // A label to show it's p5 content
-    gfx.fill(180);
-    gfx.textAlign(gfx.CENTER, gfx.TOP);
-    gfx.textSize(16);
-    gfx.text("p5 → CRT skin", gfx.width/2, 10);
+    const a = (w / 2) - 50;
+    const b = (h / 2) - 50;
+    const freqX = 3;
+    const freqY = 4;
+    const phi = t * Math.PI;
+
+    gfx.beginShape();
+    for (let i = 0; i < 200; i++) {
+      const angle = (i / 199) * Math.PI * 2;
+      const x = a * Math.sin(angle * freqX + phi);
+      const y = b * Math.sin(angle * freqY);
+      gfx.vertex(x, y);
+    }
+    gfx.endShape();
+
     gfx.pop();
 
     requestAnimationFrame(drawGfx);
@@ -44,5 +53,5 @@
 
   // Expose getter
   window.getP5Canvas = function(){ return gfx ? gfx.elt : null; };
-  window.getP5Size = function(){ return gfx ? {w: gfx.width, h: gfx.height} : {w: 640, h: 400}; };
+  window.getP5Size = function(){ return gfx ? {w: w, h: h} : {w: 640, h: 400}; };
 })();
