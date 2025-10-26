@@ -125,7 +125,9 @@ async function main() {
 
   // State
   let DPR = 1;
+  let isResizing = false;
   function resize() {
+    isResizing = true;
     DPR = Math.min(2, window.devicePixelRatio || 1);
     const cssW = Math.floor(window.innerWidth);
     const cssH = Math.floor(window.innerHeight);
@@ -145,6 +147,7 @@ async function main() {
     ping.texB = createRenderTexture(gl, skin.width, skin.height);
     ping.fbA = createFramebuffer(gl, ping.texA);
     ping.fbB = createFramebuffer(gl, ping.fbB);
+    isResizing = false;
   }
   window.addEventListener('resize', resize);
 
@@ -168,6 +171,10 @@ async function main() {
       let lastTime = start;
 
       function frame(now) {
+    if (isResizing) {
+      requestAnimationFrame(frame);
+      return;
+    }
 
         const deltaTime = (now - lastTime) * 0.001; // seconds
 
