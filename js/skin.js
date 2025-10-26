@@ -118,6 +118,7 @@ async function main() {
     uGlowingLine: gl.getUniformLocation(program, 'uGlowingLine'),
         uStaticNoise:   gl.getUniformLocation(program, 'uStaticNoise'),
         uJitter:        gl.getUniformLocation(program, 'uJitter'),
+    uRgbShift:      gl.getUniformLocation(program, 'uRgbShift'),
     uDeltaTime:     gl.getUniformLocation(program, 'uDeltaTime'),
   };
 
@@ -194,6 +195,9 @@ async function main() {
 
     // Jitter intensity. Range: 0.0 to 1.0.
     jitter: 0.1997,
+
+    // Chromatic aberration amount. Range: 0.0 to 1.0.
+    rgbShift: 0.0,
   };
 
       resize();
@@ -264,6 +268,7 @@ async function main() {
     gl.uniform1f(u.uGlowingLine, params.glowingLine);
     gl.uniform1f(u.uStaticNoise, params.staticNoise);
     gl.uniform1f(u.uJitter, params.jitter);
+    gl.uniform1f(u.uRgbShift, params.rgbShift);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
@@ -280,6 +285,7 @@ async function main() {
   requestAnimationFrame(frame);
 
   window.CRTParams = {
+    setRgbShift: (s) => params.rgbShift = s,
     setRasterMode: (m) => params.rasterMode = m | 0,
     setTint: (r, g, b) => { params.tint = [r, g, b]; },
     amber: () => { params.tint = [1.0, 0.73, 0.2]; params.chroma = 0.35; },

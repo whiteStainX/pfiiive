@@ -25,6 +25,7 @@
   uniform float uGlowingLine;    // 0..0.2
   uniform float uStaticNoise;    // 0..1
   uniform float uJitter;         // 0..1
+  uniform float uRgbShift;       // 0..1
 
   uniform sampler2D uNoiseTex;     // Noise texture
   uniform vec2      uNoiseScale;   // Scale for tiling noise texture
@@ -111,6 +112,19 @@
       fragColor = vec4(0.0,0.0,0.0,1.0); return;
     }
     vec3 col = texture(uTex, uv).rgb;
+
+    // 5.5. RGB Shift
+    if (uRgbShift > 0.0) {
+      vec2 displacement = vec2(uRgbShift * 12.0 / uResolution.x, 0.0);
+      vec3 rightColor = texture(uTex, uv + displacement).rgb;
+      vec3 leftColor = texture(uTex, uv - displacement).rgb;
+      col.r = mix(col.r, leftColor.r, 0.1);
+      col.r = mix(col.r, rightColor.r, 0.3);
+      col.g = mix(col.g, leftColor.g, 0.2);
+      col.g = mix(col.g, rightColor.g, 0.2);
+      col.b = mix(col.b, leftColor.b, 0.3);
+      col.b = mix(col.b, rightColor.b, 0.1);
+    }
 
     // --- Color & Rasterization
     // 6. Chroma/Tint
