@@ -81,6 +81,9 @@ const u = {
   uFlicker:       gl.getUniformLocation(program, 'uFlicker'),
   uPersistence:   gl.getUniformLocation(program, 'uPersistence'),
   uRasterMode:    gl.getUniformLocation(program, 'uRasterMode'),
+  uHorizontalSync:gl.getUniformLocation(program, 'uHorizontalSync'),
+  uGlowingLine:   gl.getUniformLocation(program, 'uGlowingLine'),
+  uStaticNoise:   gl.getUniformLocation(program, 'uStaticNoise'),
 };
 
 // State
@@ -126,6 +129,9 @@ const params = {
   flicker: 0.01,
   persistence: 0.04,
   rasterMode: 0, // 0 scanline, 1 subpixel, 2 pixel
+  horizontalSync: 0.1,
+  glowingLine: 0.1,
+  staticNoise: 0.05,
 };
 
 // Kick things off
@@ -177,6 +183,9 @@ function frame(now){
   gl.uniform1f(u.uFlicker, params.flicker);
   gl.uniform1f(u.uPersistence, params.persistence);
   gl.uniform1i(u.uRasterMode, params.rasterMode);
+  gl.uniform1f(u.uHorizontalSync, params.horizontalSync);
+  gl.uniform1f(u.uGlowingLine, params.glowingLine);
+  gl.uniform1f(u.uStaticNoise, params.staticNoise);
 
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
