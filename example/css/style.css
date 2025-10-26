@@ -1,8 +1,0 @@
-html, body {
-  margin: 0; padding: 0; height: 100%; background: #000;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji;
-}
-#skin-stage {
-  position: fixed; inset: 0; width: 100vw; height: 100vh; display: block;
-}
-/* Optional: a subtle bezel via box-shadow could be added here if desired */

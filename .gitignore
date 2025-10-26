@@ -166,3 +166,6 @@ dmypy.json
 build/
 dist/
 *.egg-info/
+
+# personal assets folder
+/assets/arts/
