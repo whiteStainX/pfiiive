@@ -64,10 +64,31 @@ async function main() {
     return fb;
   }
 
+  function loadTexture(gl, url) {
+    const tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255])); // 1x1 black pixel
+
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        resolve(tex);
+      };
+      img.src = url;
+    });
+  }
+
   // --- Fetch and build pipeline ---
-  const [vsSrc, fsSrc] = await Promise.all([
+  const [vsSrc, fsSrc, noiseTex] = await Promise.all([
     fetch('shaders/crt.vert').then(res => res.text()),
     fetch('shaders/crt.frag').then(res => res.text()),
+    loadTexture(gl, 'assets/images/allNoise512.png'),
   ]);
 
   const program = programFromSources(gl, vsSrc, fsSrc);
@@ -78,10 +99,12 @@ async function main() {
   const u = {
     uTex: gl.getUniformLocation(program, 'uTex'),
     uPrevTex: gl.getUniformLocation(program, 'uPrevTex'),
+    uNoiseTex: gl.getUniformLocation(program, 'uNoiseTex'),
     uResolution: gl.getUniformLocation(program, 'uResolution'),
     uTime: gl.getUniformLocation(program, 'uTime'),
     uDPR: gl.getUniformLocation(program, 'uDPR'),
     uVirtRes: gl.getUniformLocation(program, 'uVirtRes'),
+    uNoiseScale: gl.getUniformLocation(program, 'uNoiseScale'),
     uCurvature: gl.getUniformLocation(program, 'uCurvature'),
     uRasterStrength: gl.getUniformLocation(program, 'uRasterStrength'),
     uChroma: gl.getUniformLocation(program, 'uChroma'),
@@ -93,7 +116,8 @@ async function main() {
     uRasterMode: gl.getUniformLocation(program, 'uRasterMode'),
     uHorizontalSync: gl.getUniformLocation(program, 'uHorizontalSync'),
     uGlowingLine: gl.getUniformLocation(program, 'uGlowingLine'),
-    uStaticNoise: gl.getUniformLocation(program, 'uStaticNoise'),
+        uStaticNoise:   gl.getUniformLocation(program, 'uStaticNoise'),
+        uJitter:        gl.getUniformLocation(program, 'uJitter'),
   };
 
   // State
@@ -143,6 +167,7 @@ async function main() {
     horizontalSync: 0.1,
     glowingLine: 0.1,
     staticNoise: 0.05,
+    jitter: 0.1,
   };
 
   resize();
@@ -172,9 +197,18 @@ async function main() {
     gl.bindTexture(gl.TEXTURE_2D, prevTex);
     gl.uniform1i(u.uPrevTex, 1);
 
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, noiseTex);
+    gl.uniform1i(u.uNoiseTex, 2);
+
     gl.uniform2f(u.uResolution, skin.width, skin.height);
     gl.uniform1f(u.uTime, (now - start) * 0.001);
     gl.uniform1f(u.uDPR, DPR);
+
+    // Match noise texture tiling from original
+    const noiseW = 512;
+    const noiseH = 512;
+    gl.uniform2f(u.uNoiseScale, skin.width * 0.75 / noiseW, skin.height * 0.75 / noiseH);
 
     gl.uniform2f(u.uVirtRes, skin.width / DPR, skin.height / DPR);
 
@@ -190,6 +224,7 @@ async function main() {
     gl.uniform1f(u.uHorizontalSync, params.horizontalSync);
     gl.uniform1f(u.uGlowingLine, params.glowingLine);
     gl.uniform1f(u.uStaticNoise, params.staticNoise);
+    gl.uniform1f(u.uJitter, params.jitter);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 

@@ -23,6 +23,10 @@
   uniform float uHorizontalSync; // 0..1
   uniform float uGlowingLine;    // 0..0.2
   uniform float uStaticNoise;    // 0..1
+  uniform float uJitter;         // 0..1
+
+  uniform sampler2D uNoiseTex;     // Noise texture
+  uniform vec2      uNoiseScale;   // Scale for tiling noise texture
 
   // --- Fidelity constants (from cool-retro-term)
   #define INTENSITY 0.30
@@ -32,11 +36,6 @@
 
   // --- Utilities
   float rgb2grey(vec3 c){ return dot(c, vec3(0.21, 0.72, 0.04)); }
-
-  float hash(vec2 p){
-    p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
-    return fract(sin(p.x+p.y) * 43758.5453);
-  }
 
   // --- Effects
   vec2 barrel(vec2 uv, float k){
@@ -89,13 +88,17 @@
     uv = barrel(uv, uCurvature);
 
     // 2. Horizontal Sync
-    float sync = sin((uv.y + uTime * 0.001) * mix(4.0, 40.0, hash(uv))) * uHorizontalSync * 0.05;
+    vec2 noiseCoords = uv * uNoiseScale + vec2(fract(uTime / 51.0), fract(uTime / 237.0));
+    vec4 noiseTexel = texture(uNoiseTex, noiseCoords);
+    float sync = sin((uv.y + uTime * 0.001) * mix(4.0, 40.0, noiseTexel.g)) * uHorizontalSync * 0.05;
     uv.x += sync;
 
-    // 3. Jitter (skipped for now, subtle)
+    // 3. Jitter
+    vec2 jitterOffset = vec2(noiseTexel.b, noiseTexel.a) - 0.5;
+    uv += jitterOffset * 0.007 * uJitter;
 
     // 4. Static Noise
-    float noise = (hash(fragPx + uTime) - 0.5) * uStaticNoise;
+    float noise = (noiseTexel.a - 0.5) * uStaticNoise;
 
     // 5. Glowing Line
     float glowingLine = fract(smoothstep(-120.0, 0.0, uv.y * uVirtRes.y - (uVirtRes.y + 120.0) * fract(uTime * 0.00015)));
@@ -127,7 +130,8 @@
 
     // --- Final Adjustments
     // 9. Flicker
-    float f = 1.0 + (hash(fragPx + uTime*120.0) - 0.5) * (uFlicker*2.0);
+    vec2 flickerCoords = vec2(fract(uTime / 1024.0 * 2.0), fract(uTime / (1024.0 * 1024.0)));
+    float f = 1.0 + (texture(uNoiseTex, flickerCoords).g - 0.5) * (uFlicker*2.0);
     col *= f;
 
     // 10. Ambient Glow (Vignette)
