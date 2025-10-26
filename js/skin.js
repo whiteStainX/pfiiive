@@ -258,6 +258,8 @@ async function main() {
     green: () => { params.tint = [0.65, 1.0, 0.65]; params.chroma = 0.35; },
     rgb: () => { params.tint = [1.0, 1.0, 1.0]; params.chroma = 1.0; },
   };
+
+  window.getDisplayAspectRatio = () => window.innerWidth / window.innerHeight;
 }
 
 main().catch(err => console.error(err));
