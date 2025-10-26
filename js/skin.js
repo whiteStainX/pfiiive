@@ -156,19 +156,44 @@ async function main() {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
   const params = {
-    curvature: 0.10,
-    rasterStrength: 0.45,
-    chroma: 1.0,
-    tint: [1.0, 1.0, 1.0],
-    brightness: 1.0,
-    ambient: 0.05,
-    flicker: 0.01,
-    persistence: 0.04,
+    // The slider value (0-1) is multiplied by 0.4. Effective range: 0.0 to 0.4.
+    curvature: 0.3 * 0.4,
+
+    // Strength of the rasterization effect (scanlines, etc.). Range: 0.0 to 1.0.
+    rasterStrength: 0.45, // This is a good default, not explicitly in profile.
+
+    // 0.0 for monochrome, 1.0 for full color. Default Amber is low color.
+    chroma: 0.2483,
+
+    // The color tint. Default Amber is #ff8100.
+    tint: [1.0, 0.505, 0.0],
+
+    // Final brightness multiplier. Range: 0.0 to 2.0 (approx).
+    brightness: 0.5,
+
+    // The slider value (0-1) is multiplied by 0.2. Effective range: 0.0 to 0.2.
+    ambient: 0.2 * 0.2,
+
+    // Flicker intensity. Range: 0.0 to 1.0.
+    flicker: 0.1,
+
+    // Fade time in seconds. Higher value = longer trail.
+    persistence: 0.4, // Approximates the feel of the original's default burnIn value.
+
+    // 0: scanlines, 1: subpixels, 2: pixel cells.
     rasterMode: 0,
-    horizontalSync: 0.1,
-    glowingLine: 0.1,
-    staticNoise: 0.05,
-    jitter: 0.1,
+
+    // The slider value (0-1) is mapped to the range 0.05 to 0.35.
+    horizontalSync: 0.08, // This is the raw value from the profile.
+
+    // The slider value (0-1) is multiplied by 0.2. Effective range: 0.0 to 0.2.
+    glowingLine: 0.2 * 0.2,
+
+    // Static noise intensity. Range: 0.0 to 1.0.
+    staticNoise: 0.1198,
+
+    // Jitter intensity. Range: 0.0 to 1.0.
+    jitter: 0.1997,
   };
 
       resize();
