@@ -7,6 +7,7 @@
   uniform sampler2D uPrevTex;    // previous frame (persistence)
   uniform vec2  uResolution;     // framebuffer size in pixels
   uniform float uTime;           // seconds
+  uniform float uDeltaTime;      // seconds
   uniform float uDPR;            // devicePixelRatio
   uniform vec2  uVirtRes;        // virtual raster grid (x,y)
 
@@ -117,9 +118,12 @@
     col = uTint * mix(vec3(g), col, uChroma);
     col += noise;
 
-    // 7. Persistence
+    // 7. Persistence (Burn-In)
     vec3 prev = texture(uPrevTex, vUV).rgb;
-    col = max(col, prev * (1.0 - uPersistence * 10.0)); // Decay prev frame
+    // uPersistence is now a fade time. A value of 0.5 means it takes ~0.5s to fade.
+    float decay = uDeltaTime / max(0.001, uPersistence);
+    vec3 decayedPrev = max(vec3(0.0), prev - decay);
+    col = max(col, decayedPrev);
 
     // 8. Rasterization
     vec3 ras;

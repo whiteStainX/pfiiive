@@ -118,6 +118,7 @@ async function main() {
     uGlowingLine: gl.getUniformLocation(program, 'uGlowingLine'),
         uStaticNoise:   gl.getUniformLocation(program, 'uStaticNoise'),
         uJitter:        gl.getUniformLocation(program, 'uJitter'),
+    uDeltaTime:     gl.getUniformLocation(program, 'uDeltaTime'),
   };
 
   // State
@@ -170,11 +171,23 @@ async function main() {
     jitter: 0.1,
   };
 
-  resize();
+      resize();
 
-  let start = performance.now();
-  function frame(now) {
-    const p5Canvas = window.getP5Canvas && window.getP5Canvas();
+    
+
+      const start = performance.now();
+
+      let lastTime = start;
+
+      function frame(now) {
+
+        const deltaTime = (now - lastTime) * 0.001; // seconds
+
+        lastTime = now;
+
+    
+
+        const p5Canvas = window.getP5Canvas && window.getP5Canvas();
     const p5Size = window.getP5Size ? window.getP5Size() : { w: 640, h: 400 };
 
     if (p5Canvas) {
@@ -203,6 +216,7 @@ async function main() {
 
     gl.uniform2f(u.uResolution, skin.width, skin.height);
     gl.uniform1f(u.uTime, (now - start) * 0.001);
+    gl.uniform1f(u.uDeltaTime, deltaTime);
     gl.uniform1f(u.uDPR, DPR);
 
     // Match noise texture tiling from original
