@@ -85,10 +85,11 @@ async function main() {
   }
 
   // --- Fetch and build pipeline ---
-  const [vsSrc, fsSrc, noiseTex] = await Promise.all([
+  const [vsSrc, fsSrc, noiseTex, params] = await Promise.all([
     fetch('shaders/crt.vert').then(res => res.text()),
     fetch('shaders/crt.frag').then(res => res.text()),
     loadTexture(gl, 'assets/images/allNoise512.png'),
+    fetch('config.json').then(res => res.json()),
   ]);
 
   const program = programFromSources(gl, vsSrc, fsSrc);
@@ -156,49 +157,7 @@ async function main() {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-  const params = {
-    // The slider value (0-1) is multiplied by 0.4. Effective range: 0.0 to 0.4.
-    curvature: 0.1 * 0.4, // Further reduced
 
-    // Strength of the rasterization effect (scanlines, etc.). Range: 0.0 to 1.0.
-    rasterStrength: 0.45, // This is a good default, not explicitly in profile.
-
-    // 0.0 for monochrome, 1.0 for full color. Default Amber is low color.
-    chroma: 0.2483,
-
-    // The color tint. Default Amber is #ff8100.
-    tint: [1.0, 0.505, 0.0],
-
-    // Final brightness multiplier. Range: 0.0 to 2.0 (approx).
-    brightness: 0.65, // Increased for a brighter image
-
-    // The slider value (0-1) is multiplied by 0.2. Effective range: 0.0 to 0.2.
-    ambient: 0.2 * 0.2,
-
-    // Flicker intensity. Range: 0.0 to 1.0.
-    flicker: 0.1,
-
-    // Fade time in seconds. Higher value = longer trail.
-    persistence: 0.4, // Approximates the feel of the original's default burnIn value.
-
-    // 0: scanlines, 1: subpixels, 2: pixel cells.
-    rasterMode: 0,
-
-    // The slider value (0-1) is mapped to the range 0.05 to 0.35.
-    horizontalSync: 0.01, // Further reduced
-
-    // The slider value (0-1) is multiplied by 0.2. Effective range: 0.0 to 0.2.
-    glowingLine: 0.2 * 0.2,
-
-    // Static noise intensity. Range: 0.0 to 1.0.
-    staticNoise: 0.1198,
-
-    // Jitter intensity. Range: 0.0 to 1.0.
-    jitter: 0.015, // Further reduced
-
-    // Chromatic aberration amount. Range: 0.0 to 1.0.
-    rgbShift: 0.0,
-  };
 
       resize();
 
