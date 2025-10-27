@@ -49,6 +49,25 @@ export function createUnknownPleasures3DSketch(
   let introT = 0;
   const target = new THREE.Vector3(0, options.targetY ?? -0.35, 0);
   const lineGroup = new THREE.Group();
+  const rowSeeds = new Float32Array(ROWS);
+  const rowPhaseOffsets = new Float32Array(ROWS);
+  const rowPhaseRates = new Float32Array(ROWS);
+  const rowSampleOffsets = new Float32Array(ROWS);
+  const rowWarpStrengths = new Float32Array(ROWS);
+  const rowBaseRoughness = new Float32Array(ROWS);
+  const rowHighLevels = new Float32Array(ROWS);
+  const rowLowLevels = new Float32Array(ROWS);
+  for (let r = 0; r < ROWS; r++) {
+    const norm = ROWS > 1 ? r / (ROWS - 1) : 0;
+    const centerWeight = 1.0 - Math.abs(norm * 2.0 - 1.0);
+    rowSeeds[r] = Math.random() * 1000 + r * 13.371;
+    rowPhaseOffsets[r] = (Math.random() * 2.0 - 1.0) * Math.PI * 0.9;
+    rowPhaseRates[r] = 0.08 + Math.random() * 0.22;
+    rowSampleOffsets[r] = (Math.random() * 2.0 - 1.0) * (0.45 + (1.0 - centerWeight) * 0.35);
+    rowWarpStrengths[r] = 0.65 + Math.random() * 0.95 + (1.0 - centerWeight) * 0.35;
+    rowBaseRoughness[r] =
+      roughness * (0.65 + Math.random() * 1.25 + (1.0 - centerWeight) * 0.45);
+  }
   const cameraState = {
     baseRadiusStart: options.cameraRadiusStart ?? 9.2,
     baseRadiusEnd: options.cameraRadiusEnd ?? 12.6,
@@ -71,6 +90,9 @@ export function createUnknownPleasures3DSketch(
       uniform float uWaveSpeed1, uWaveSpeed2, uWaveSpeed3;
       uniform float uRowIndex, uRows, uCols, uWidth;
       uniform float uRoughness;
+      uniform float uRowSeed;
+      uniform float uRowWarpStrength;
+      uniform float uRowPhaseShift;
       varying float vCenterWeight;
       float hash(float n){ return fract(sin(n) * 43758.5453123); }
       float noise(vec2 x){
@@ -85,21 +107,40 @@ export function createUnknownPleasures3DSketch(
       }
       void main(){
         vec3 p = position;
-        float t = (p.x / uWidth) * 2.0;
-        float w1 = sin((t*3.14159*1.0) + uTime*uWaveSpeed1);
-        float w2 = 0.6 * sin((t*3.14159*2.0) - uTime*uWaveSpeed2);
-        float w3 = 0.35 * sin((t*3.14159*4.0) + uTime*uWaveSpeed3);
-        float base = abs(w1 + w2 + w3);
-        float center = pow(1.0 - min(1.0, abs(t)), max(0.0001, uWaveExpandPower));
-        float amp = uWaveExpandAmplitude * center;
-        float rowPhase = 0.18 * uRowIndex;
-        float bandNoise = (noise(vec2(t * 5.7 + uRowIndex * 0.17, uTime * 0.18 + uRowIndex * 0.11)) - 0.5);
-        float fineRipple = sin(t * 28.0 + rowPhase + uTime * 1.25) * 0.5;
-        float edgeNoise = (1.0 - center) * (0.06 + 0.04 * sin(t*36.0 + uRowIndex * 1.7 + uTime * 0.6));
+        float baseT = (p.x / uWidth) * 2.0;
+        float lateralFocus = pow(max(0.0, 1.0 - abs(baseT)), 1.8);
+        float ridgeFocus = pow(max(0.0, 1.0 - abs(baseT * 1.1)), 2.4);
+        float edgeEase = 1.0 - lateralFocus;
+        float rowHash = hash(uRowSeed * 1.213 + uRowIndex * 23.47);
+        float rowHash2 = hash(uRowSeed * 2.731 + uRowIndex * 11.79);
+        float rowHash3 = hash(uRowSeed * 4.913 + uRowIndex * 7.27);
+        float localTime = uTime + uRowSeed * 0.015;
+        float warp1 = sin(baseT * (1.6 + rowHash * 0.9) + localTime * (0.12 + rowHash2 * 0.4) + uRowPhaseShift) * 0.32;
+        float warp2 = noise(vec2(baseT * (3.8 + rowHash2 * 1.7) + uRowSeed * 0.31, localTime * (0.22 + rowHash3 * 0.5)));
+        float warp3 = sin(baseT * (11.0 + rowHash3 * 6.5) + localTime * (1.3 + rowHash2) + uRowSeed);
+        float warpT = baseT;
+        warpT += warp1 * 0.16 * uRowWarpStrength * mix(0.45, 1.0, ridgeFocus);
+        warpT += warp2 * 0.12 * mix(0.3, 1.0, ridgeFocus) * (1.0 - abs(baseT));
+        warpT += warp3 * 0.016 * ridgeFocus;
+        float baseFreq = mix(0.9 + rowHash * 0.25, 1.45 + rowHash * 0.35, ridgeFocus);
+        float midFreq = mix(1.6 + rowHash2 * 0.4, 2.6 + rowHash2 * 0.35, ridgeFocus);
+        float fineFreq = mix(2.6 + rowHash3 * 0.5, 3.4 + rowHash3 * 0.45, ridgeFocus);
+        float w1 = sin((warpT * 3.14159 * baseFreq) + localTime*uWaveSpeed1 + uRowPhaseShift);
+        float w2 = (0.45 + 0.28 * rowHash2) * sin((warpT * 3.14159 * midFreq) - localTime*uWaveSpeed2 + uRowPhaseShift * 0.7);
+        float w3 = (0.2 + 0.18 * rowHash3) * sin((warpT * 3.14159 * fineFreq) + localTime*uWaveSpeed3 + rowHash2 * 6.2831);
+        float base = abs(w1 + w2 * ridgeFocus + w3 * ridgeFocus * 0.75);
+        float center = pow(1.0 - min(1.0, abs(warpT)), max(0.0001, uWaveExpandPower));
+        float amp = uWaveExpandAmplitude * center * mix(0.18, 1.0, ridgeFocus);
+        float bandNoise = (noise(vec2(warpT * 4.7 + uRowSeed * 0.17, localTime * 0.38 + uRowIndex * 0.21)) - 0.5) * lateralFocus;
+        float fineRipple = sin(warpT * (18.0 + rowHash3 * 7.0) + rowHash2 * 6.2831 + localTime * (1.2 + rowHash * 0.5)) * (0.32 + 0.18 * rowHash) * ridgeFocus;
+        float serration = sin(warpT * (36.0 + rowHash * 18.0) + localTime * (2.4 + rowHash2 * 1.8)) * (1.0 - center) * ridgeFocus;
+        float grain = (noise(vec2(warpT * 19.0 + localTime * 0.7, localTime * 1.7 + uRowSeed * 0.5)) - 0.5) * ridgeFocus;
+        float edgeNoise = edgeEase * 0.012 * sin(warpT * 9.0 + uRowIndex * 0.7 + localTime * 0.4);
         p.y += amp * base;
-        p.y += uRoughness * (bandNoise + fineRipple);
+        p.y += uRoughness * ((bandNoise * (0.6 + 0.4 * rowHash) * ridgeFocus) + (fineRipple * (0.45 + 0.35 * rowHash2)));
+        p.y += uRoughness * (0.34 * grain + 0.16 * serration);
         p.y += edgeNoise;
-        p.y += 0.02 * center;
+        p.y += 0.012 * center * ridgeFocus;
         p.y = max(p.y, 0.0);
         vCenterWeight = center;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
@@ -121,29 +162,53 @@ export function createUnknownPleasures3DSketch(
       uniform vec3 uColor;
       varying float vCenterWeight;
       void main(){
-        float alpha = smoothstep(0.0, 0.35, vCenterWeight);
+        float alpha = smoothstep(0.0, 0.25, vCenterWeight);
         gl_FragColor = vec4(uColor, alpha);
       }
     `;
 
   const sampleRow = (row) => {
-    if (!analyser) return 0;
-    if (!bins) return 0;
+    if (!analyser) return { energy: 0, low: 0, high: 0 };
+    if (!bins) return { energy: 0, low: 0, high: 0 };
     const binCount = bins.length;
-    if (binCount === 0) return 0;
-    const span = Math.max(2, Math.floor(binCount / ROWS));
-    const start = Math.min(
-      binCount - 1,
-      Math.floor((row / Math.max(1.0, ROWS - 1)) * binCount)
-    );
+    if (binCount === 0) return { energy: 0, low: 0, high: 0 };
+    const baseSpan = Math.max(4, Math.floor(binCount / (ROWS * 0.85)));
+    const norm = ROWS > 1 ? row / (ROWS - 1) : 0;
+    const centerIndex = norm * (binCount - 1);
+    const offset = rowSampleOffsets[row] * baseSpan;
+    let start = Math.floor(centerIndex - baseSpan * 0.5 + offset);
+    start = Math.max(0, Math.min(binCount - baseSpan, start));
     let sum = 0;
-    let count = 0;
-    for (let i = 0; i < span; i++) {
+    let weightSum = 0;
+    let low = 0;
+    let mid = 0;
+    let high = 0;
+    let lowCount = 0;
+    let midCount = 0;
+    let highCount = 0;
+    for (let i = 0; i < baseSpan; i++) {
       const idx = Math.min(binCount - 1, start + i);
-      sum += bins[idx];
-      count++;
+      const magnitude = bins[idx] / 255;
+      const rel = baseSpan > 1 ? i / (baseSpan - 1) : 0;
+      const weight = 0.6 + 0.4 * Math.cos(rel * Math.PI);
+      sum += magnitude * weight;
+      weightSum += weight;
+      if (rel < 0.34) {
+        low += magnitude;
+        lowCount++;
+      } else if (rel < 0.67) {
+        mid += magnitude;
+        midCount++;
+      } else {
+        high += magnitude;
+        highCount++;
+      }
     }
-    return count > 0 ? sum / (count * 255) : 0;
+    return {
+      energy: weightSum > 0 ? sum / weightSum : 0,
+      low: lowCount > 0 ? low / lowCount : 0,
+      high: highCount > 0 ? high / highCount : 0,
+    };
   };
 
   const setup = () => {
@@ -282,7 +347,10 @@ export function createUnknownPleasures3DSketch(
         uRows: { value: ROWS },
         uCols: { value: COLS },
         uWidth: { value: WIDTH },
-        uRoughness: { value: roughness },
+        uRoughness: { value: rowBaseRoughness[r] },
+        uRowSeed: { value: rowSeeds[r] },
+        uRowWarpStrength: { value: rowWarpStrengths[r] },
+        uRowPhaseShift: { value: rowPhaseOffsets[r] },
       };
 
       const material = new THREE.ShaderMaterial({
@@ -305,13 +373,14 @@ export function createUnknownPleasures3DSketch(
       const occluderMaterial = new THREE.ShaderMaterial({
         uniforms: {
           ...dynamicUniforms,
-          uColor: { value: backgroundColor.clone() },
+          uColor: { value: lineColor.clone() },
         },
         vertexShader: vertSrc,
         fragmentShader: fragOccluderSrc,
-        transparent: false,
+        transparent: true,
         depthWrite: true,
         depthTest: true,
+        alphaTest: 0.02,
         side: THREE.DoubleSide,
         polygonOffset: true,
         polygonOffsetFactor: 1,
@@ -409,27 +478,64 @@ export function createUnknownPleasures3DSketch(
       const { uniforms } = lines[r];
       uniforms.uTime.value = now;
 
-      const sample = sampleRow(r);
-      const diff = sample - rowLevels[r];
+      const { energy, high, low } = sampleRow(r);
+      const diff = energy - rowLevels[r];
       const rate = diff > 0 ? rowAttack : rowRelease;
       rowLevels[r] += diff * rate;
       rowLevels[r] = Math.max(0, rowLevels[r]);
+      const highDiff = high - rowHighLevels[r];
+      rowHighLevels[r] += highDiff * 0.35;
+      rowHighLevels[r] = Math.max(0, rowHighLevels[r]);
+      const lowDiff = low - rowLowLevels[r];
+      rowLowLevels[r] += lowDiff * 0.22;
+      rowLowLevels[r] = Math.max(0, rowLowLevels[r]);
 
       const rowNorm = ROWS > 1 ? r / (ROWS - 1) : 0;
       const centerWeight = 1.0 - Math.abs(rowNorm * 2.0 - 1.0);
-      const poweredCenter = Math.pow(centerWeight, 2.15);
-      const staticAmp = 0.1 + 0.52 * poweredCenter;
-      const audioAmp = rowLevels[r] * (0.34 + 1.05 * poweredCenter);
-      const noiseAmp =
-        (1.0 - centerWeight) * 0.03 * (1.0 + Math.sin(now * 1.7 + r * 0.9));
+      const amplitudeFocus = 0.88 + 0.12 * Math.pow(centerWeight, 1.45);
+      const nuanceFocus = Math.pow(centerWeight, 1.75);
+      const fringeEase = Math.pow(1.0 - centerWeight, 2.0);
+      const staticAmp = (0.16 + 0.22 * amplitudeFocus) * amplitudeFocus;
+      const audioAmp = rowLevels[r] * (0.18 + 0.46 * amplitudeFocus);
+      const detailBump = rowHighLevels[r] * 0.05 * amplitudeFocus;
+      const shimmer =
+        0.01 * amplitudeFocus * (0.6 + 0.4 * Math.sin(now * 1.6 + r * 0.8));
+      const bassLift = THREE.MathUtils.lerp(
+        0.9,
+        1.18,
+        Math.min(1, rowLowLevels[r] * (0.3 + nuanceFocus * 0.5))
+      );
 
+      const baseTarget = (staticAmp + audioAmp + detailBump + shimmer) * bassLift;
       const targetAmp = THREE.MathUtils.lerp(
-        0.02,
-        staticAmp + audioAmp + noiseAmp,
+        0.014 + 0.018 * amplitudeFocus,
+        baseTarget,
         introEase
       );
       uniforms.uWaveExpandAmplitude.value +=
         (targetAmp - uniforms.uWaveExpandAmplitude.value) * 0.24;
+      const warpTarget =
+        rowWarpStrengths[r] * (0.74 + nuanceFocus * 0.38) +
+        rowHighLevels[r] * 0.58 * nuanceFocus +
+        rowLowLevels[r] * 0.32 * nuanceFocus;
+      uniforms.uRowWarpStrength.value +=
+        (warpTarget - uniforms.uRowWarpStrength.value) * 0.18;
+      const phase =
+        rowPhaseOffsets[r] +
+        now * rowPhaseRates[r] * (0.55 + rowHighLevels[r] * 0.45 * nuanceFocus) +
+        rowLevels[r] * 1.6 * nuanceFocus;
+      uniforms.uRowPhaseShift.value = phase;
+      const roughTarget =
+        rowBaseRoughness[r] *
+        (0.9 +
+          nuanceFocus *
+            (0.58 +
+              rowHighLevels[r] * 0.65 +
+              rowLevels[r] * 0.48 +
+              rowLowLevels[r] * 0.22) +
+          fringeEase * 0.14);
+      uniforms.uRoughness.value +=
+        (roughTarget - uniforms.uRoughness.value) * 0.2;
     }
   };
 
