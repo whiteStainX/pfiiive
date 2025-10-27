@@ -51,7 +51,7 @@ export function createThreeProducer(sketchPath = '../three_sketches/unknown_plea
         .then(module => {
           const createSketch = Object.values(module).find(f => typeof f === 'function');
           if (createSketch) {
-            sketch = createSketch();
+            sketch = createSketch(THREE, renderer);
             if (sketch.setup) {
               scene = sketch.setup();
             }
