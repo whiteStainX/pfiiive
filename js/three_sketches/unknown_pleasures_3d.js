@@ -28,7 +28,7 @@ export function createUnknownPleasures3DSketch(
     s3: options.speed3 ?? 0.95,
   };
   const wavePower = options.wavePower ?? 1.35;
-  const audioUrl = options.audioUrl ?? "assets/live.mp3";
+  const audioUrl = options.audioUrl ?? "assets/track.mp3";
   const fftSize = options.fftSize ?? 512;
   const smoothing = options.smoothing ?? 0.68;
   const introSpeed = options.introSpeed ?? 0.1;
@@ -217,7 +217,7 @@ export function createUnknownPleasures3DSketch(
 
     renderer.setClearColor(backgroundColor, 1);
 
-    camera.fov = 30;
+    camera.fov = 20;
     camera.near = 0.1;
     camera.far = 40;
     camera.position.set(0, 3.0, 10.5);

@@ -10,7 +10,7 @@
   "rasterMode": 0,
   "horizontalSync": 0.01,
   "glowingLine": 0.04,
-  "staticNoise": 0.1198,
+  "staticNoise": 0.0,
   "jitter": 0.015,
   "rgbShift": 0.0,
   "bloomIntensity": 0.9,
