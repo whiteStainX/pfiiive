@@ -26,21 +26,45 @@ export function createThreeProducer() {
   camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
   camera.position.z = 3;
 
-  // Demo content: rotating TorusKnot (wireframe)
-  const geo = new THREE.TorusKnotGeometry(0.8, 0.25, 220, 32);
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.1, roughness: 0.4, wireframe: true });
-  const mesh = new THREE.Mesh(geo, mat);
-  scene.add(mesh);
+  // --- Unknown Pleasures scene ---
+  const lines = [];
+  const numLines = 80;
+  const lineLength = 2.5;
+  const segmentCount = 128;
 
-  const light = new THREE.DirectionalLight(0xffffff, 1.2);
-  light.position.set(1, 1, 1);
-  scene.add(light);
-  scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+  for (let i = 0; i < numLines; i++) {
+    const y = -1.5 + (i / numLines) * 3;
+    const points = [];
+    for (let j = 0; j < segmentCount; j++) {
+      const x = -lineLength / 2 + (j / (segmentCount - 1)) * lineLength;
+      points.push(new THREE.Vector3(x, y, 0));
+    }
+
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    const mat = new THREE.LineBasicMaterial({ color: 0xffffff });
+    const line = new THREE.Line(geo, mat);
+    line.originalY = y;
+    lines.push(line);
+    scene.add(line);
+  }
 
   function tick(t) {
     if (!running) return;
-    mesh.rotation.x = t * 0.0005;
-    mesh.rotation.y = t * 0.0007;
+
+    const time = t * 0.0001;
+    lines.forEach((line, i) => {
+      const positions = line.geometry.attributes.position.array;
+      const envelope = Math.exp(-0.05 * Math.pow(i - numLines / 2, 2));
+
+      for (let j = 0; j < segmentCount; j++) {
+        const x = positions[j * 3];
+        const noise = new THREE.Vector3(); // Using built-in noise might not exist, let's use Math.random for now
+        const displacement = Math.random() > 0.9 ? Math.random() * envelope * 0.5 : 0;
+        positions[j * 3 + 1] = line.originalY - displacement;
+      }
+      line.geometry.attributes.position.needsUpdate = true;
+    });
+
     renderer.render(scene, camera);
     animId = requestAnimationFrame(tick);
   }
