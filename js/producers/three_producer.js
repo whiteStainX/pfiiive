@@ -1,12 +1,10 @@
-// js/producers/three_producer.js
-// Offscreen three.js renderer as a FrameProducer.
-// Requires THREE to be available globally (via CDN) or adjust to ESM import.
-
-export function createThreeProducer() {
+export function createThreeProducer(sketchPath = '../three_sketches/unknown_pleasures_3d.js') {
   if (typeof THREE === 'undefined') {
     console.warn('THREE not found. Include three.min.js before using three producer.');
+    return null;
   }
-  let renderer, scene, camera, animId = null;
+
+  let renderer, scene, camera, sketch, animId = null;
   let w = 640, h = 400;
   let running = false;
 
@@ -19,61 +17,27 @@ export function createThreeProducer() {
     powerPreference: 'high-performance',
     preserveDrawingBuffer: false,
   });
-  renderer.setPixelRatio(1);     // DPR handled by skin
-  renderer.setSize(w, h, false); // logical size; no CSS
+  renderer.setPixelRatio(1);
+  renderer.setSize(w, h, false);
 
-  scene = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
   camera.position.z = 3;
 
-  // --- Unknown Pleasures scene ---
-  const lines = [];
-  const numLines = 80;
-  const lineLength = 2.5;
-  const segmentCount = 128;
-
-  for (let i = 0; i < numLines; i++) {
-    const y = -1.5 + (i / numLines) * 3;
-    const points = [];
-    for (let j = 0; j < segmentCount; j++) {
-      const x = -lineLength / 2 + (j / (segmentCount - 1)) * lineLength;
-      points.push(new THREE.Vector3(x, y, 0));
-    }
-
-    const geo = new THREE.BufferGeometry().setFromPoints(points);
-    const mat = new THREE.LineBasicMaterial({ color: 0xffffff });
-    const line = new THREE.Line(geo, mat);
-    line.originalY = y;
-    lines.push(line);
-    scene.add(line);
-  }
-
   function tick(t) {
     if (!running) return;
-
-    const time = t * 0.0001;
-    lines.forEach((line, i) => {
-      const positions = line.geometry.attributes.position.array;
-      const envelope = Math.exp(-0.05 * Math.pow(i - numLines / 2, 2));
-
-      for (let j = 0; j < segmentCount; j++) {
-        const x = positions[j * 3];
-        const noise = new THREE.Vector3(); // Using built-in noise might not exist, let's use Math.random for now
-        const displacement = Math.random() > 0.9 ? Math.random() * envelope * 0.5 : 0;
-        positions[j * 3 + 1] = line.originalY - displacement;
-      }
-      line.geometry.attributes.position.needsUpdate = true;
-    });
-
-    renderer.render(scene, camera);
+    if (sketch && sketch.update) {
+      sketch.update(t);
+    }
+    if (scene && camera) {
+      renderer.render(scene, camera);
+    }
     animId = requestAnimationFrame(tick);
   }
 
-  return {
-    getCanvas() { return dom; },
-    getSize() { return { w, h }; },
+  const host = {
+    getCanvas: () => dom,
+    getSize: () => ({ w, h }),
     resize(cssW, cssH, dpr) {
-      // choose a practical render size (half CSS is often plenty)
       w = Math.max(320, Math.floor(cssW / 2));
       h = Math.max(200, Math.floor(cssH / 2));
       renderer.setSize(w, h, false);
@@ -83,11 +47,26 @@ export function createThreeProducer() {
     start() {
       if (running) return;
       running = true;
-      animId = requestAnimationFrame(tick);
+      import(sketchPath)
+        .then(module => {
+          const createSketch = Object.values(module).find(f => typeof f === 'function');
+          if (createSketch) {
+            sketch = createSketch();
+            if (sketch.setup) {
+              scene = sketch.setup();
+            }
+            animId = requestAnimationFrame(tick);
+          } else {
+            console.error(`No sketch creation function found in ${sketchPath}`);
+          }
+        })
+        .catch(err => console.error(`Failed to load sketch from ${sketchPath}:`, err));
     },
     stop() {
       running = false;
       if (animId) cancelAnimationFrame(animId);
     },
   };
+
+  return host;
 }
