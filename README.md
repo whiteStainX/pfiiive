@@ -57,6 +57,36 @@ The project is designed to be run with a simple local server.
 
 ### Configuration
 
+
+
 All visual effects are controlled by parameters in the `config.json` file in the project root. You can live-edit these values and refresh the browser to see the changes.
 
-To change the visual content, simply edit the `index.html` file to point to a different p5.js sketch within the `js/p5_sketches/` directory.
+
+
+### Switching Content
+
+
+
+The default content producer (the p5.js or three.js scene) can be set by editing a single line in `js/skin.js`:
+
+
+
+```javascript
+
+// In js/skin.js
+
+const defaultProducer = 'p5'; // Change to 'three' to start with the 3D scene
+
+```
+
+
+
+You can also switch between producers at runtime by using the `PFIIIVE.useP5()` and `PFIIIVE.useThree()` commands in your browser's developer console.
+
+
+
+### Developer's Note: Creating New Sketches
+
+
+
+Both the p5.js and three.js producers are designed as generic hosts that can run any compatible sketch. Sketches are located in `js/p5_sketches/` and `js/three_sketches/` and must conform to a simple, standardized interface. For detailed guidelines on how to create your own sketches, please see the documentation in the `/docs` folder.

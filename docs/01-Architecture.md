@@ -12,35 +12,45 @@ This is achieved through a three-layer system:
 
 ## The Three Layers
 
-Here is a visual representation of the data flow between the layers:
+Here is a visual representation of the data flow between the layers. The key is the abstraction of the "Logic Layer" into a generic **Producer** that runs a specific **Sketch**.
 
 ```ascii
 +--------------------+
-|   1. Logic Layer   |   (e.g., p5.js sketch)
+| Sketch: p5         |----(e.g., unknown_pleasures.js)
 +--------------------+
-           |
-           | Draws 2D content into a fixed-size
-           | offscreen buffer (e.g., 640x400).
-           | Knows nothing about the final display.
-           ▼
+
 +--------------------+
-| 2. HTML/JS Layer   |   (skin.js)
+| Sketch: three.js   |----(e.g., unknown_pleasures_3d.js)
 +--------------------+
-           |
-           | 1. Grabs the Logic Layer's output as a texture.
-           | 2. Manages the final, full-screen WebGL canvas.
-           | 3. Orchestrates the multi-pass rendering of the Skin Layer.
-           | 4. Feeds user input and config settings to the shaders.
-           ▼
-+--------------------+
-|   3. Skin Layer    |   (WebGL Shaders: crt.frag, bloom.frag, etc.)
-+--------------------+
-           |
-           | 1. Receives the Logic Layer texture as input.
-           | 2. Applies all post-processing effects (curvature, bloom, etc.).
-           | 3. Renders the final, stylized image to the screen.
-           |
-           ▼
+
+
+      (select one sketch to load)
+             |
+             ▼
++------------------------------------+
+| 1. Logic Layer (Producer)          |   (e.g., p5_producer.js)
+| - Hosts the p5/three environment   |
+| - Loads and runs a specific sketch |
+| - Draws to a fixed-size buffer     |
++------------------------------------+
+             |
+             | getCanvas()
+             ▼
++------------------------------------+
+| 2. HTML/JS Layer (skin.js)         |
+| - Grabs producer's canvas as input |
+| - Manages final WebGL canvas       |
+| - Orchestrates render passes       |
++------------------------------------+
+             |
+             ▼
++------------------------------------+
+| 3. Skin Layer (WebGL Shaders)      |
+| - Applies CRT & Bloom effects      |
+| - Renders final image to screen    |
++------------------------------------+
+             |
+             ▼
       [ Final Display ]
 ```
 
