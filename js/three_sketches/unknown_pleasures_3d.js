@@ -63,17 +63,19 @@ export function createUnknownPleasures3DSketch(
     rowSeeds[r] = Math.random() * 1000 + r * 13.371;
     rowPhaseOffsets[r] = (Math.random() * 2.0 - 1.0) * Math.PI * 0.9;
     rowPhaseRates[r] = 0.08 + Math.random() * 0.22;
-    rowSampleOffsets[r] = (Math.random() * 2.0 - 1.0) * (0.45 + (1.0 - centerWeight) * 0.35);
-    rowWarpStrengths[r] = 0.65 + Math.random() * 0.95 + (1.0 - centerWeight) * 0.35;
+    rowSampleOffsets[r] =
+      (Math.random() * 2.0 - 1.0) * (0.45 + (1.0 - centerWeight) * 0.35);
+    rowWarpStrengths[r] =
+      0.65 + Math.random() * 0.95 + (1.0 - centerWeight) * 0.35;
     rowBaseRoughness[r] =
       roughness * (0.65 + Math.random() * 1.25 + (1.0 - centerWeight) * 0.45);
   }
   const cameraState = {
-    baseRadiusStart: options.cameraRadiusStart ?? 9.2,
-    baseRadiusEnd: options.cameraRadiusEnd ?? 12.6,
-    basePolarStart: options.cameraPolarStart ?? 0.68,
-    basePolarEnd: options.cameraPolarEnd ?? 0.52,
-    baseAzimuthOffset: options.cameraAzimuth ?? 0.18,
+    baseRadiusStart: options.cameraRadiusStart ?? 15,
+    baseRadiusEnd: options.cameraRadiusEnd ?? 15,
+    basePolarStart: options.cameraPolarStart ?? 0.0,
+    basePolarEnd: options.cameraPolarEnd ?? 0.0,
+    baseAzimuthOffset: options.cameraAzimuth ?? 0.0,
     userAzimuth: 0,
     userPolar: 0,
     userRadius: 0,
@@ -160,10 +162,8 @@ export function createUnknownPleasures3DSketch(
   const fragOccluderSrc = `
       precision highp float;
       uniform vec3 uColor;
-      varying float vCenterWeight;
       void main(){
-        float alpha = smoothstep(0.0, 0.25, vCenterWeight);
-        gl_FragColor = vec4(uColor, alpha);
+        gl_FragColor = vec4(uColor, 1.0);
       }
     `;
 
@@ -245,97 +245,36 @@ export function createUnknownPleasures3DSketch(
       window.addEventListener("keydown", startAudio, { once: true });
     });
 
-    const geometry = new THREE.PlaneGeometry(
-      WIDTH,
-      LINE_THICKNESS,
-      COLS - 1,
-      1
-    );
-    geometry.translate(0, 0, 0);
-
     const totalDepth = (ROWS - 1) * GAP_Z;
     const centerOffsetZ = totalDepth * 0.5;
 
-    const canvas = renderer.domElement;
-    if (canvas) {
-      canvas.style.cursor = "grab";
-      canvas.style.touchAction = "none";
-      const pointerState = {
-        pointerId: null,
-        startX: 0,
-        startY: 0,
-        startAzimuth: 0,
-        startPolar: 0,
-      };
-
-      const onPointerDown = (ev) => {
-        if (pointerState.pointerId !== null) return;
-        pointerState.pointerId = ev.pointerId;
-        pointerState.startX = ev.clientX;
-        pointerState.startY = ev.clientY;
-        pointerState.startAzimuth = cameraState.targetAzimuth;
-        pointerState.startPolar = cameraState.targetPolar;
-        cameraState.dragging = true;
-        canvas.style.cursor = "grabbing";
-        canvas.setPointerCapture(ev.pointerId);
-      };
-
-      const onPointerMove = (ev) => {
-        if (pointerState.pointerId !== ev.pointerId) return;
-        const rect = canvas.getBoundingClientRect();
-        const dx = (ev.clientX - pointerState.startX) / rect.width;
-        const dy = (ev.clientY - pointerState.startY) / rect.height;
-        cameraState.targetAzimuth =
-          pointerState.startAzimuth - dx * Math.PI * 1.2;
-        cameraState.targetPolar = THREE.MathUtils.clamp(
-          pointerState.startPolar - dy * Math.PI * 0.7,
-          -0.75,
-          0.75
-        );
-      };
-
-      const releasePointer = (ev) => {
-        if (pointerState.pointerId !== ev.pointerId) return;
-        cameraState.dragging = false;
-        pointerState.pointerId = null;
-        canvas.style.cursor = "grab";
-        if (
-          typeof canvas.hasPointerCapture === "function" &&
-          canvas.hasPointerCapture(ev.pointerId)
-        ) {
-          canvas.releasePointerCapture(ev.pointerId);
-        }
-      };
-
-      const onPointerUp = (ev) => {
-        releasePointer(ev);
-      };
-
-      canvas.addEventListener("pointerdown", onPointerDown);
-      canvas.addEventListener("pointermove", onPointerMove);
-      canvas.addEventListener("pointerup", onPointerUp);
-      canvas.addEventListener("pointercancel", releasePointer);
-      canvas.addEventListener("lostpointercapture", () => {
-        pointerState.pointerId = null;
-        cameraState.dragging = false;
-        canvas.style.cursor = "grab";
-      });
-
-      canvas.addEventListener(
-        "wheel",
-        (ev) => {
-          ev.preventDefault();
-          cameraState.targetRadius = THREE.MathUtils.clamp(
-            cameraState.targetRadius + ev.deltaY * 0.0024,
-            options.minCameraRadiusOffset ?? -4.0,
-            options.maxCameraRadiusOffset ?? 3.5
-          );
-        },
-        { passive: false }
-      );
-    }
-
     for (let r = 0; r < ROWS; r++) {
+      const lineGeo = new THREE.PlaneGeometry(
+        WIDTH,
+        LINE_THICKNESS,
+        COLS - 1,
+        1
+      );
+      lineGeo.translate(0, 0, 0);
+
+      // Create a custom geometry for the occluder
+      const occluderGeo = new THREE.BufferGeometry();
+      const occluderPositions = new Float32Array(COLS * 2 * 3); // Each point on the line has a corresponding bottom point
+      occluderGeo.setAttribute(
+        "position",
+        new THREE.BufferAttribute(occluderPositions, 3)
+      );
+
+      const indices = [];
+      for (let i = 0; i < COLS - 1; i++) {
+        const a = i * 2;
+        const b = a + 1;
+        const c = a + 2;
+        const d = a + 3;
+        indices.push(a, b, c);
+        indices.push(b, d, c);
+      }
+      occluderGeo.setIndex(indices);
       const dynamicUniforms = {
         uTime: { value: 0 },
         uWaveExpandAmplitude: { value: 0 },
@@ -373,28 +312,26 @@ export function createUnknownPleasures3DSketch(
       const occluderMaterial = new THREE.ShaderMaterial({
         uniforms: {
           ...dynamicUniforms,
-          uColor: { value: lineColor.clone() },
+          uColor: { value: backgroundColor.clone() },
         },
         vertexShader: vertSrc,
         fragmentShader: fragOccluderSrc,
-        transparent: true,
+        transparent: false,
         depthWrite: true,
         depthTest: true,
-        alphaTest: 0.02,
         side: THREE.DoubleSide,
         polygonOffset: true,
         polygonOffsetFactor: 1,
         polygonOffsetUnits: 1,
       });
 
-      const occluder = new THREE.Mesh(geometry, occluderMaterial);
+      const occluder = new THREE.Mesh(occluderGeo, occluderMaterial);
       occluder.position.z = -r * GAP_Z + centerOffsetZ;
-      occluder.position.y = -0.0025;
       occluder.renderOrder = r * 2;
       occluder.frustumCulled = false;
       lineGroup.add(occluder);
 
-      const mesh = new THREE.Mesh(geometry, material);
+      const mesh = new THREE.Mesh(lineGeo, material);
       mesh.position.z = -r * GAP_Z + centerOffsetZ;
       mesh.renderOrder = r * 2 + 1;
       mesh.frustumCulled = false;
@@ -475,67 +412,34 @@ export function createUnknownPleasures3DSketch(
     lineGroup.rotation.x = tilt;
 
     for (let r = 0; r < ROWS; r++) {
-      const { uniforms } = lines[r];
+      const { mesh, occluder, uniforms } = lines[r];
       uniforms.uTime.value = now;
 
-      const { energy, high, low } = sampleRow(r);
-      const diff = energy - rowLevels[r];
-      const rate = diff > 0 ? rowAttack : rowRelease;
-      rowLevels[r] += diff * rate;
-      rowLevels[r] = Math.max(0, rowLevels[r]);
-      const highDiff = high - rowHighLevels[r];
-      rowHighLevels[r] += highDiff * 0.35;
-      rowHighLevels[r] = Math.max(0, rowHighLevels[r]);
-      const lowDiff = low - rowLowLevels[r];
-      rowLowLevels[r] += lowDiff * 0.22;
-      rowLowLevels[r] = Math.max(0, rowLowLevels[r]);
+      // Update the line vertices via the shader
+      const ampRaw = sampleRow(r).energy;
+      const prev = uniforms.uWaveExpandAmplitude.value;
+      const target = ampRaw * 0.6; // Increased from 0.32, volume here
+      uniforms.uWaveExpandAmplitude.value = prev + (target - prev) * 0.18;
 
-      const rowNorm = ROWS > 1 ? r / (ROWS - 1) : 0;
-      const centerWeight = 1.0 - Math.abs(rowNorm * 2.0 - 1.0);
-      const amplitudeFocus = 0.88 + 0.12 * Math.pow(centerWeight, 1.45);
-      const nuanceFocus = Math.pow(centerWeight, 1.75);
-      const fringeEase = Math.pow(1.0 - centerWeight, 2.0);
-      const staticAmp = (0.16 + 0.22 * amplitudeFocus) * amplitudeFocus;
-      const audioAmp = rowLevels[r] * (0.18 + 0.46 * amplitudeFocus);
-      const detailBump = rowHighLevels[r] * 0.05 * amplitudeFocus;
-      const shimmer =
-        0.01 * amplitudeFocus * (0.6 + 0.4 * Math.sin(now * 1.6 + r * 0.8));
-      const bassLift = THREE.MathUtils.lerp(
-        0.9,
-        1.18,
-        Math.min(1, rowLowLevels[r] * (0.3 + nuanceFocus * 0.5))
-      );
+      // Manually update the occluder geometry
+      const linePositions = mesh.geometry.attributes.position.array;
+      const occluderPositions = occluder.geometry.attributes.position.array;
+      for (let i = 0; i < COLS; i++) {
+        const x = linePositions[i * 3];
+        const y = linePositions[i * 3 + 1]; // This is the displaced Y from the shader
+        const z = linePositions[i * 3 + 2];
 
-      const baseTarget = (staticAmp + audioAmp + detailBump + shimmer) * bassLift;
-      const targetAmp = THREE.MathUtils.lerp(
-        0.014 + 0.018 * amplitudeFocus,
-        baseTarget,
-        introEase
-      );
-      uniforms.uWaveExpandAmplitude.value +=
-        (targetAmp - uniforms.uWaveExpandAmplitude.value) * 0.24;
-      const warpTarget =
-        rowWarpStrengths[r] * (0.74 + nuanceFocus * 0.38) +
-        rowHighLevels[r] * 0.58 * nuanceFocus +
-        rowLowLevels[r] * 0.32 * nuanceFocus;
-      uniforms.uRowWarpStrength.value +=
-        (warpTarget - uniforms.uRowWarpStrength.value) * 0.18;
-      const phase =
-        rowPhaseOffsets[r] +
-        now * rowPhaseRates[r] * (0.55 + rowHighLevels[r] * 0.45 * nuanceFocus) +
-        rowLevels[r] * 1.6 * nuanceFocus;
-      uniforms.uRowPhaseShift.value = phase;
-      const roughTarget =
-        rowBaseRoughness[r] *
-        (0.9 +
-          nuanceFocus *
-            (0.58 +
-              rowHighLevels[r] * 0.65 +
-              rowLevels[r] * 0.48 +
-              rowLowLevels[r] * 0.22) +
-          fringeEase * 0.14);
-      uniforms.uRoughness.value +=
-        (roughTarget - uniforms.uRoughness.value) * 0.2;
+        // Top vertex of the occluder
+        occluderPositions[i * 6 + 0] = x;
+        occluderPositions[i * 6 + 1] = y;
+        occluderPositions[i * 6 + 2] = z;
+
+        // Bottom vertex of the occluder
+        occluderPositions[i * 6 + 3] = x;
+        occluderPositions[i * 6 + 4] = -100; // A very low value
+        occluderPositions[i * 6 + 5] = z;
+      }
+      occluder.geometry.attributes.position.needsUpdate = true;
     }
   };
 
