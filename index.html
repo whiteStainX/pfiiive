@@ -16,7 +16,11 @@
   <script src="https://unpkg.com/p5@1.9.0/lib/p5.min.js"></script>
 
   <!-- three.js from CDN -->
-  <script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
+  <!-- <script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script> -->
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
+    window.THREE = THREE; // optional if you still need global fallback
+  </script>
 
   <!-- Producer Modules -->
   <script src="js/producers/p5_producer.js" type="module"></script>
