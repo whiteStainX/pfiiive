@@ -28,7 +28,7 @@ export function createUnknownPleasures3DSketch(
     s3: options.speed3 ?? 0.95,
   };
   const wavePower = options.wavePower ?? 1.35;
-  const audioUrl = options.audioUrl ?? "assets/track.mp3";
+  const audioUrl = options.audioUrl ?? "assets/live.mp3";
   const fftSize = options.fftSize ?? 512;
   const smoothing = options.smoothing ?? 0.68;
   const introSpeed = options.introSpeed ?? 0.1;
@@ -132,7 +132,10 @@ export function createUnknownPleasures3DSketch(
     const binCount = bins.length;
     if (binCount === 0) return 0;
     const span = Math.max(2, Math.floor(binCount / ROWS));
-    const start = Math.min(binCount - 1, Math.floor((row / Math.max(1.0, ROWS - 1)) * binCount));
+    const start = Math.min(
+      binCount - 1,
+      Math.floor((row / Math.max(1.0, ROWS - 1)) * binCount)
+    );
     let sum = 0;
     let count = 0;
     for (let i = 0; i < span; i++) {
@@ -149,7 +152,7 @@ export function createUnknownPleasures3DSketch(
 
     renderer.setClearColor(backgroundColor, 1);
 
-    camera.fov = 48;
+    camera.fov = 30;
     camera.near = 0.1;
     camera.far = 40;
     camera.position.set(0, 3.0, 10.5);
@@ -177,7 +180,12 @@ export function createUnknownPleasures3DSketch(
       window.addEventListener("keydown", startAudio, { once: true });
     });
 
-    const geometry = new THREE.PlaneGeometry(WIDTH, LINE_THICKNESS, COLS - 1, 1);
+    const geometry = new THREE.PlaneGeometry(
+      WIDTH,
+      LINE_THICKNESS,
+      COLS - 1,
+      1
+    );
     geometry.translate(0, 0, 0);
 
     const totalDepth = (ROWS - 1) * GAP_Z;
@@ -212,7 +220,8 @@ export function createUnknownPleasures3DSketch(
         const rect = canvas.getBoundingClientRect();
         const dx = (ev.clientX - pointerState.startX) / rect.width;
         const dy = (ev.clientY - pointerState.startY) / rect.height;
-        cameraState.targetAzimuth = pointerState.startAzimuth - dx * Math.PI * 1.2;
+        cameraState.targetAzimuth =
+          pointerState.startAzimuth - dx * Math.PI * 1.2;
         cameraState.targetPolar = THREE.MathUtils.clamp(
           pointerState.startPolar - dy * Math.PI * 0.7,
           -0.75,
@@ -225,7 +234,10 @@ export function createUnknownPleasures3DSketch(
         cameraState.dragging = false;
         pointerState.pointerId = null;
         canvas.style.cursor = "grab";
-        if (typeof canvas.hasPointerCapture === "function" && canvas.hasPointerCapture(ev.pointerId)) {
+        if (
+          typeof canvas.hasPointerCapture === "function" &&
+          canvas.hasPointerCapture(ev.pointerId)
+        ) {
           canvas.releasePointerCapture(ev.pointerId);
         }
       };
@@ -354,7 +366,9 @@ export function createUnknownPleasures3DSketch(
       introEase
     );
     const autoAzimuth =
-      (cameraState.dragging ? 0.0 : 1.0) * 0.08 * Math.sin(now * autoOrbitSpeed);
+      (cameraState.dragging ? 0.0 : 1.0) *
+      0.08 *
+      Math.sin(now * autoOrbitSpeed);
 
     cameraState.userAzimuth +=
       (cameraState.targetAzimuth - cameraState.userAzimuth) * 0.18;
@@ -368,7 +382,8 @@ export function createUnknownPleasures3DSketch(
       0.28,
       1.18
     );
-    const azimuth = cameraState.baseAzimuthOffset + autoAzimuth + cameraState.userAzimuth;
+    const azimuth =
+      cameraState.baseAzimuthOffset + autoAzimuth + cameraState.userAzimuth;
     const radius = THREE.MathUtils.clamp(
       baseRadius + cameraState.userRadius,
       6.0,
@@ -405,7 +420,8 @@ export function createUnknownPleasures3DSketch(
       const poweredCenter = Math.pow(centerWeight, 2.15);
       const staticAmp = 0.1 + 0.52 * poweredCenter;
       const audioAmp = rowLevels[r] * (0.34 + 1.05 * poweredCenter);
-      const noiseAmp = (1.0 - centerWeight) * 0.03 * (1.0 + Math.sin(now * 1.7 + r * 0.9));
+      const noiseAmp =
+        (1.0 - centerWeight) * 0.03 * (1.0 + Math.sin(now * 1.7 + r * 0.9));
 
       const targetAmp = THREE.MathUtils.lerp(
         0.02,
