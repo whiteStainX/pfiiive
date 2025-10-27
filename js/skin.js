@@ -1,6 +1,9 @@
 // WebGL2 glue: renders CRT shader sampling the p5 graphics canvas.
 // Now loads shaders from external files.
 
+import { createP5Producer } from './producers/p5_producer.js';
+import { createThreeProducer } from './producers/three_producer.js';
+
 async function main() {
   const skin = document.getElementById('skin-stage');
   const gl = skin.getContext('webgl2', { alpha: false, antialias: false });
@@ -9,6 +12,22 @@ async function main() {
     alert('WebGL2 not available in this browser.');
     throw new Error('WebGL2 not available');
   }
+
+  // --- Producer Setup ---
+  let producer = createP5Producer();
+  producer.start();
+
+  function setProducer(kind) {
+    producer.stop();
+    producer = (kind === 'three') ? createThreeProducer() : createP5Producer();
+    producer.start();
+    resize(); // Ensure sizes are synced
+  }
+
+  window.PFIIIVE = {
+    useP5: () => setProducer('p5'),
+    useThree: () => setProducer('three'),
+  };
 
   // --- Helpers ---
   function compile(gl, type, src) {
@@ -171,6 +190,10 @@ async function main() {
     skin.height = Math.floor(cssH * DPR);
     gl.viewport(0, 0, skin.width, skin.height);
 
+    producer.resize(cssW, cssH, DPR);
+
+    // Recreate ping-pong buffers for main CRT effect
+
     if (ping.texA) {
       gl.deleteTexture(ping.texA);
       gl.deleteTexture(ping.texB);
@@ -223,7 +246,7 @@ async function main() {
     const deltaTime = (now - lastTime) * 0.001; // seconds
     lastTime = now;
 
-    const p5Canvas = window.getP5Canvas && window.getP5Canvas();
+    const p5Canvas = producer.getCanvas();
 
     if (p5Canvas) {
       gl.activeTexture(gl.TEXTURE0);
