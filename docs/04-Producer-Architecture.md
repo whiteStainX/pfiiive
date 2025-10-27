@@ -84,18 +84,19 @@ export function createP5Producer(sketchPath = '../p5_sketches/my_sketch.js') {
 The process is very similar for three.js.
 
 1.  Create a new file in `js/three_sketches/`.
-2.  Export a function (e.g., `export function createMyThreeSketch()`).
+2.  Export a function (e.g., `export function createMyThreeSketch(THREE, renderer, camera)`).
 3.  This function must return an object with two methods: `setup()` and `update(t)`.
+   The producer passes in its existing camera so your sketch can retune it without re-instantiating a new one.
 
 **Interface:**
 
--   `setup()`: Called once. This function is responsible for creating and configuring all your three.js objects (geometries, materials, meshes) and must return a `THREE.Scene` object.
+-   `setup()`: Called once. This function is responsible for creating and configuring all your three.js objects (geometries, materials, meshes) and must return either a `THREE.Scene` object **or** an object shaped like `{ scene, camera }` if you need to swap in a custom camera.
 -   `update(t)`: Called on every frame. Use this to animate your objects. `t` is the high-resolution time.
 
 **Example (`my_3d_sketch.js`):**
 
 ```javascript
-export function createMyThreeSketch() {
+export function createMyThreeSketch(THREE, renderer, camera) {
   let mesh;
 
   const setup = () => {
@@ -104,7 +105,9 @@ export function createMyThreeSketch() {
     const mat = new THREE.MeshNormalMaterial();
     mesh = new THREE.Mesh(geo, mat);
     scene.add(mesh);
-    return scene;
+    camera.position.set(0, 0, 5);
+    camera.lookAt(0, 0, 0);
+    return { scene, camera };
   };
 
   const update = (t) => {

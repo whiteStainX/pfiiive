@@ -1,52 +1,50 @@
-export function createUnknownPleasures3DSketch(THREE, renderer, opts = {}) {
-  const ROWS = opts.rows ?? 69;
-  // CHANGE: Reduced column count. Since we are using a BoxGeometry with its own
-  // vertex subdivisions, we don't need to manually define this many points for a line.
-  // The original project used 128 subdivisions in its BoxGeometry.
-  const COLS = opts.cols ?? 128;
-  const WIDTH = opts.width ?? 6.0;
-  const GAP_Z = opts.gapZ ?? 0.075;
-  const speeds = {
-    s1: opts.speed1 ?? 0.28,
-    s2: opts.speed2 ?? 0.52,
-    s3: opts.speed3 ?? 0.95,
-  };
-  const wavePower = opts.wavePower ?? 1.35;
-  const audioUrl = opts.audioUrl ?? "assets/track.mp3";
-  const fftSize = opts.fftSize ?? 512;
-  const smoothing = opts.smoothing ?? 0.82;
+export function createUnknownPleasures3DSketch(
+  THREE,
+  renderer,
+  maybeCamera,
+  opts = {}
+) {
+  let camera = null;
+  let options = opts;
 
-  let scene, camera, analyser, lines, target; // CHANGE: Renamed 'strips' to 'lines' for clarity
-  const bins = new Uint8Array(fftSize / 2);
-  let introT = 0;
+  if (maybeCamera && maybeCamera.isCamera) {
+    camera = maybeCamera;
+  } else if (maybeCamera && typeof maybeCamera === "object") {
+    options = maybeCamera;
+  }
 
-  const setup = () => {
-    scene = new THREE.Scene();
+  if (!camera) {
     camera = new THREE.PerspectiveCamera(48, 1, 0.1, 100);
-    camera.position.set(0, 2.2, 6.0);
-    target = new THREE.Vector3(0, 0, 0);
+  }
 
-    const listener = new THREE.AudioListener();
-    const audioObj = new THREE.Object3D();
-    audioObj.add(listener);
-    scene.add(audioObj);
-    const audio = new THREE.Audio(listener);
-    const loader = new THREE.AudioLoader();
-    analyser = new THREE.AudioAnalyser(audio, fftSize);
-    analyser.analyser.smoothingTimeConstant = smoothing;
+  const ROWS = options.rows ?? 69;
+  const COLS = options.cols ?? 256;
+  const WIDTH = options.width ?? 6.0;
+  const LINE_THICKNESS = options.lineThickness ?? 0.05;
+  const GAP_Z = options.gapZ ?? 0.075;
+  const speeds = {
+    s1: options.speed1 ?? 0.28,
+    s2: options.speed2 ?? 0.52,
+    s3: options.speed3 ?? 0.95,
+  };
+  const wavePower = options.wavePower ?? 1.35;
+  const audioUrl = options.audioUrl ?? "assets/track.mp3";
+  const fftSize = options.fftSize ?? 512;
+  const smoothing = options.smoothing ?? 0.82;
+  const introSpeed = options.introSpeed ?? 0.1;
 
-    loader.load(audioUrl, (buffer) => {
-      audio.setBuffer(buffer);
-      audio.setLoop(true);
-      audio.setVolume(0.8);
-      const startAudio = () => {
-        if (!audio.isPlaying) audio.play();
-        window.removeEventListener("click", startAudio);
-      };
-      window.addEventListener("click", startAudio, { once: true });
-    });
+  let scene;
+  let analyser;
+  let audio;
+  const lines = [];
+  const rowLevels = new Float32Array(ROWS);
+  const bins = new Uint8Array(fftSize / 2);
+  let lastTime = performance.now();
+  let introT = 0;
+  const target = new THREE.Vector3(0, options.targetY ?? -0.35, 0);
+  const lineGroup = new THREE.Group();
 
-    const vertSrc = `
+  const vertSrc = `
       uniform float uTime;
       uniform float uWaveExpandAmplitude;
       uniform float uWaveExpandPower;
@@ -66,27 +64,71 @@ export function createUnknownPleasures3DSketch(THREE, renderer, opts = {}) {
         gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
       }
     `;
-    const fragSrc = `
+
+  const fragSrc = `
+      precision highp float;
       void main(){
-        gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+        gl_FragColor = vec4(1.0);
       }
     `;
 
-    // CHANGE: The geometry is now a BoxGeometry to give the lines thickness,
-    // matching the original project's technique. This is the key to achieving the
-    // ribbon-like visual style. We create one geometry and reuse it for all lines
-    // for better performance.
-    const lineGeometry = new THREE.BoxGeometry(WIDTH, 0.03, 0.02, COLS, 1, 1);
+  const sampleRow = (row) => {
+    if (!analyser) return 0;
+    const binCount = bins.length;
+    if (binCount === 0) return 0;
+    const span = Math.max(2, Math.floor(binCount / ROWS));
+    const start = Math.min(binCount - 1, Math.floor((row / Math.max(1.0, ROWS - 1)) * binCount));
+    let sum = 0;
+    let count = 0;
+    for (let i = 0; i < span; i++) {
+      const idx = Math.min(binCount - 1, start + i);
+      sum += bins[idx];
+      count++;
+    }
+    return count > 0 ? sum / (count * 255) : 0;
+  };
 
-    lines = [];
-    // CHANGE: The group of lines needs to be centered so the camera looks at the
-    // middle of the stack, not the very first line. This prevents perspective
-    // from collapsing all the lines into what looks like a single one.
+  const setup = () => {
+    scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x000000, 8, 22);
+
+    renderer.setClearColor(0x000000, 1);
+
+    camera.fov = 48;
+    camera.near = 0.1;
+    camera.far = 40;
+    camera.position.set(0, 2.2, 9.0);
+    camera.lookAt(target);
+    camera.updateProjectionMatrix();
+
+    const listener = new THREE.AudioListener();
+    camera.add(listener);
+    audio = new THREE.Audio(listener);
+    const loader = new THREE.AudioLoader();
+    analyser = new THREE.AudioAnalyser(audio, fftSize);
+    analyser.analyser.smoothingTimeConstant = smoothing;
+
+    loader.load(audioUrl, (buffer) => {
+      audio.setBuffer(buffer);
+      audio.setLoop(true);
+      audio.setVolume(options.volume ?? 0.85);
+      const startAudio = () => {
+        if (!audio.isPlaying) {
+          audio.play();
+        }
+      };
+      window.addEventListener("pointerdown", startAudio, { once: true });
+      window.addEventListener("keydown", startAudio, { once: true });
+    });
+
+    const geometry = new THREE.PlaneGeometry(WIDTH, LINE_THICKNESS, COLS - 1, 1);
+    geometry.translate(0, 0, 0);
+
     const totalDepth = (ROWS - 1) * GAP_Z;
-    const centerOffsetZ = totalDepth / 2;
+    const centerOffsetZ = totalDepth * 0.5;
 
     for (let r = 0; r < ROWS; r++) {
-      const mat = new THREE.ShaderMaterial({
+      const material = new THREE.ShaderMaterial({
         uniforms: {
           uTime: { value: 0 },
           uWaveExpandAmplitude: { value: 0 },
@@ -101,53 +143,62 @@ export function createUnknownPleasures3DSketch(THREE, renderer, opts = {}) {
         },
         vertexShader: vertSrc,
         fragmentShader: fragSrc,
+        transparent: true,
+        depthWrite: false,
+        depthTest: false,
+        side: THREE.DoubleSide,
       });
 
-      // CHANGE: Switched from THREE.Line to THREE.Mesh to use the BoxGeometry.
-      // This allows the line to have a visible surface that can be displaced.
-      const mesh = new THREE.Mesh(lineGeometry, mat);
-
-      // CHANGE: Apply the centering offset to each line's Z position.
+      const mesh = new THREE.Mesh(geometry, material);
       mesh.position.z = -r * GAP_Z + centerOffsetZ;
-
-      scene.add(mesh);
-      lines.push(mesh);
+      mesh.renderOrder = r;
+      lineGroup.add(mesh);
+      lines.push({ mesh, uniforms: material.uniforms });
     }
-    return scene;
+
+    lineGroup.position.y = -0.6;
+    lineGroup.rotation.x = -0.12;
+    scene.add(lineGroup);
+
+    return { scene, camera };
   };
 
-  let lastTime = performance.now();
   const update = (nowMs) => {
-    const dt = Math.max(0, (nowMs - lastTime) * 0.001);
+    const dt = Math.min(0.1, Math.max(0, (nowMs - lastTime) * 0.001));
     lastTime = nowMs;
 
-    if (analyser) analyser.getFrequencyData(bins);
-
-    for (let r = 0; r < ROWS; r++) {
-      const line = lines[r];
-      const u = line.material.uniforms;
-      u.uTime.value = nowMs * 0.001;
-      const ampRaw =
-        bins[Math.floor((r / Math.max(1, ROWS - 1)) * (bins.length - 1))] / 255;
-      const prev = u.uWaveExpandAmplitude.value;
-
-      // CHANGE: Increased the amplitude multiplier. The original value (0.32)
-      // was too small, making the wave displacement from the audio nearly
-      // invisible. This new value makes the response to the music much stronger
-      // and more apparent.
-      const target = ampRaw * 0.8;
-
-      u.uWaveExpandAmplitude.value = prev + (target - prev) * 0.18;
+    const now = nowMs * 0.001;
+    if (analyser) {
+      analyser.getFrequencyData(bins);
     }
 
-    // CHANGE: Modified the camera animation for a smoother, more noticeable
-    // introduction. We now slowly pull the camera back and up, which gives a
-    // better sense of scale and feels less static than the original animation.
-    introT = Math.min(1, introT + dt * 0.1); // Animation progress (0 to 1)
-    const y = 2.2 + 1.8 * introT; // Animate Y from 2.2 to 4.0
-    const z = 6.0 + 4.0 * introT; // Animate Z from 6.0 to 10.0
-    camera.position.set(0, y, z);
+    introT = Math.min(1, introT + dt * introSpeed);
+    const introEase = introT * introT * (3 - 2 * introT);
+
+    const camY = THREE.MathUtils.lerp(2.2, 4.2, introEase);
+    const camZ = THREE.MathUtils.lerp(9.0, 11.0, introEase);
+    camera.position.set(0, camY, camZ);
     camera.lookAt(target);
+
+    const tilt = THREE.MathUtils.lerp(-0.12, -0.32, introEase);
+    lineGroup.rotation.x = tilt;
+
+    for (let r = 0; r < ROWS; r++) {
+      const { uniforms } = lines[r];
+      uniforms.uTime.value = now;
+
+      const sample = sampleRow(r);
+      rowLevels[r] += (sample - rowLevels[r]) * 0.25;
+
+      const rowNorm = ROWS > 1 ? r / (ROWS - 1) : 0;
+      const centerWeight = 1.0 - Math.abs(rowNorm * 2.0 - 1.0);
+      const staticAmp = 0.12 + 0.45 * Math.pow(centerWeight, 1.75);
+      const audioAmp = rowLevels[r] * (0.3 + 0.8 * centerWeight);
+
+      const targetAmp = THREE.MathUtils.lerp(0.02, staticAmp + audioAmp, introEase);
+      uniforms.uWaveExpandAmplitude.value +=
+        (targetAmp - uniforms.uWaveExpandAmplitude.value) * 0.2;
+    }
   };
 
   return { setup, update };

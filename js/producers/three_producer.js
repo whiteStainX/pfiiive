@@ -4,7 +4,7 @@ export function createThreeProducer(sketchPath = '../three_sketches/unknown_plea
     return null;
   }
 
-  let renderer, scene, camera, sketch, animId = null;
+  let renderer, scene, camera, activeCamera, sketch, animId = null;
   let w = 640, h = 400;
   let running = false;
 
@@ -22,14 +22,15 @@ export function createThreeProducer(sketchPath = '../three_sketches/unknown_plea
 
   camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 100);
   camera.position.z = 3;
+  activeCamera = camera;
 
   function tick(t) {
     if (!running) return;
     if (sketch && sketch.update) {
       sketch.update(t);
     }
-    if (scene && camera) {
-      renderer.render(scene, camera);
+    if (scene && activeCamera) {
+      renderer.render(scene, activeCamera);
     }
     animId = requestAnimationFrame(tick);
   }
@@ -41,8 +42,10 @@ export function createThreeProducer(sketchPath = '../three_sketches/unknown_plea
       w = Math.max(320, Math.floor(cssW / 2));
       h = Math.max(200, Math.floor(cssH / 2));
       renderer.setSize(w, h, false);
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
+      if (activeCamera) {
+        activeCamera.aspect = w / h;
+        activeCamera.updateProjectionMatrix();
+      }
     },
     start() {
       if (running) return;
@@ -51,9 +54,19 @@ export function createThreeProducer(sketchPath = '../three_sketches/unknown_plea
         .then(module => {
           const createSketch = Object.values(module).find(f => typeof f === 'function');
           if (createSketch) {
-            sketch = createSketch(THREE, renderer);
-            if (sketch.setup) {
-              scene = sketch.setup();
+            sketch = createSketch(THREE, renderer, activeCamera);
+            if (sketch && sketch.setup) {
+              const setupResult = sketch.setup();
+              if (setupResult && setupResult.scene) {
+                scene = setupResult.scene;
+                if (setupResult.camera) {
+                  activeCamera = setupResult.camera;
+                }
+              } else if (setupResult && setupResult.isScene) {
+                scene = setupResult;
+              } else if (setupResult) {
+                scene = setupResult;
+              }
             }
             animId = requestAnimationFrame(tick);
           } else {
