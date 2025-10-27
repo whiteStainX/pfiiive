@@ -13,7 +13,7 @@
   "staticNoise": 0.1198,
   "jitter": 0.015,
   "rgbShift": 0.0,
-  "bloomIntensity": 0.5,
+  "bloomIntensity": 0.9,
   "bloomThreshold": 0.6,
   "bloomSoftKnee": 0.5,
   "bloomResolutionScale": 0.4,
