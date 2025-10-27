@@ -38,7 +38,7 @@ export function createUnknownPleasures3DSketch(
   let audio;
   const lines = [];
   const rowLevels = new Float32Array(ROWS);
-  const bins = new Uint8Array(fftSize / 2);
+  let bins = null;
   let lastTime = performance.now();
   let introT = 0;
   const target = new THREE.Vector3(0, options.targetY ?? -0.35, 0);
@@ -74,6 +74,7 @@ export function createUnknownPleasures3DSketch(
 
   const sampleRow = (row) => {
     if (!analyser) return 0;
+    if (!bins) return 0;
     const binCount = bins.length;
     if (binCount === 0) return 0;
     const span = Math.max(2, Math.floor(binCount / ROWS));
@@ -107,6 +108,7 @@ export function createUnknownPleasures3DSketch(
     const loader = new THREE.AudioLoader();
     analyser = new THREE.AudioAnalyser(audio, fftSize);
     analyser.analyser.smoothingTimeConstant = smoothing;
+    bins = analyser.data;
 
     loader.load(audioUrl, (buffer) => {
       audio.setBuffer(buffer);
@@ -169,7 +171,10 @@ export function createUnknownPleasures3DSketch(
 
     const now = nowMs * 0.001;
     if (analyser) {
-      analyser.getFrequencyData(bins);
+      const freqData = analyser.getFrequencyData();
+      if (freqData && freqData !== bins) {
+        bins = freqData;
+      }
     }
 
     introT = Math.min(1, introT + dt * introSpeed);
