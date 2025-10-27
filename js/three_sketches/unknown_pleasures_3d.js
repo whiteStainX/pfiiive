@@ -249,13 +249,21 @@ export function createUnknownPleasures3DSketch(
     const centerOffsetZ = totalDepth * 0.5;
 
     for (let r = 0; r < ROWS; r++) {
-      const lineGeo = new THREE.PlaneGeometry(WIDTH, LINE_THICKNESS, COLS - 1, 1);
+      const lineGeo = new THREE.PlaneGeometry(
+        WIDTH,
+        LINE_THICKNESS,
+        COLS - 1,
+        1
+      );
       lineGeo.translate(0, 0, 0);
 
       // Create a custom geometry for the occluder
       const occluderGeo = new THREE.BufferGeometry();
       const occluderPositions = new Float32Array(COLS * 2 * 3); // Each point on the line has a corresponding bottom point
-      occluderGeo.setAttribute('position', new THREE.BufferAttribute(occluderPositions, 3));
+      occluderGeo.setAttribute(
+        "position",
+        new THREE.BufferAttribute(occluderPositions, 3)
+      );
 
       const indices = [];
       for (let i = 0; i < COLS - 1; i++) {
@@ -304,7 +312,7 @@ export function createUnknownPleasures3DSketch(
       const occluderMaterial = new THREE.ShaderMaterial({
         uniforms: {
           ...dynamicUniforms,
-          uColor: { value: new THREE.Color(0xff0000) }, // DEBUG: Set to red
+          uColor: { value: backgroundColor.clone() },
         },
         vertexShader: vertSrc,
         fragmentShader: fragOccluderSrc,
@@ -410,7 +418,7 @@ export function createUnknownPleasures3DSketch(
       // Update the line vertices via the shader
       const ampRaw = sampleRow(r).energy;
       const prev = uniforms.uWaveExpandAmplitude.value;
-      const target = ampRaw * 0.32;
+      const target = ampRaw * 0.6; // Increased from 0.32, volume here
       uniforms.uWaveExpandAmplitude.value = prev + (target - prev) * 0.18;
 
       // Manually update the occluder geometry
