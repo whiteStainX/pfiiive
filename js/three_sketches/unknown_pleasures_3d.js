@@ -63,17 +63,19 @@ export function createUnknownPleasures3DSketch(
     rowSeeds[r] = Math.random() * 1000 + r * 13.371;
     rowPhaseOffsets[r] = (Math.random() * 2.0 - 1.0) * Math.PI * 0.9;
     rowPhaseRates[r] = 0.08 + Math.random() * 0.22;
-    rowSampleOffsets[r] = (Math.random() * 2.0 - 1.0) * (0.45 + (1.0 - centerWeight) * 0.35);
-    rowWarpStrengths[r] = 0.65 + Math.random() * 0.95 + (1.0 - centerWeight) * 0.35;
+    rowSampleOffsets[r] =
+      (Math.random() * 2.0 - 1.0) * (0.45 + (1.0 - centerWeight) * 0.35);
+    rowWarpStrengths[r] =
+      0.65 + Math.random() * 0.95 + (1.0 - centerWeight) * 0.35;
     rowBaseRoughness[r] =
       roughness * (0.65 + Math.random() * 1.25 + (1.0 - centerWeight) * 0.45);
   }
   const cameraState = {
-    baseRadiusStart: options.cameraRadiusStart ?? 9.2,
-    baseRadiusEnd: options.cameraRadiusEnd ?? 12.6,
-    basePolarStart: options.cameraPolarStart ?? 0.68,
-    basePolarEnd: options.cameraPolarEnd ?? 0.52,
-    baseAzimuthOffset: options.cameraAzimuth ?? 0.18,
+    baseRadiusStart: options.cameraRadiusStart ?? 15,
+    baseRadiusEnd: options.cameraRadiusEnd ?? 15,
+    basePolarStart: options.cameraPolarStart ?? 0.0,
+    basePolarEnd: options.cameraPolarEnd ?? 0.0,
+    baseAzimuthOffset: options.cameraAzimuth ?? 0.0,
     userAzimuth: 0,
     userPolar: 0,
     userRadius: 0,
@@ -160,10 +162,8 @@ export function createUnknownPleasures3DSketch(
   const fragOccluderSrc = `
       precision highp float;
       uniform vec3 uColor;
-      varying float vCenterWeight;
       void main(){
-        float alpha = smoothstep(0.0, 0.25, vCenterWeight);
-        gl_FragColor = vec4(uColor, alpha);
+        gl_FragColor = vec4(uColor, 1.0);
       }
     `;
 
@@ -373,14 +373,13 @@ export function createUnknownPleasures3DSketch(
       const occluderMaterial = new THREE.ShaderMaterial({
         uniforms: {
           ...dynamicUniforms,
-          uColor: { value: lineColor.clone() },
+          uColor: { value: backgroundColor.clone() },
         },
         vertexShader: vertSrc,
         fragmentShader: fragOccluderSrc,
-        transparent: true,
+        transparent: false,
         depthWrite: true,
         depthTest: true,
-        alphaTest: 0.02,
         side: THREE.DoubleSide,
         polygonOffset: true,
         polygonOffsetFactor: 1,
@@ -506,7 +505,8 @@ export function createUnknownPleasures3DSketch(
         Math.min(1, rowLowLevels[r] * (0.3 + nuanceFocus * 0.5))
       );
 
-      const baseTarget = (staticAmp + audioAmp + detailBump + shimmer) * bassLift;
+      const baseTarget =
+        (staticAmp + audioAmp + detailBump + shimmer) * bassLift;
       const targetAmp = THREE.MathUtils.lerp(
         0.014 + 0.018 * amplitudeFocus,
         baseTarget,
@@ -522,7 +522,9 @@ export function createUnknownPleasures3DSketch(
         (warpTarget - uniforms.uRowWarpStrength.value) * 0.18;
       const phase =
         rowPhaseOffsets[r] +
-        now * rowPhaseRates[r] * (0.55 + rowHighLevels[r] * 0.45 * nuanceFocus) +
+        now *
+          rowPhaseRates[r] *
+          (0.55 + rowHighLevels[r] * 0.45 * nuanceFocus) +
         rowLevels[r] * 1.6 * nuanceFocus;
       uniforms.uRowPhaseShift.value = phase;
       const roughTarget =
