@@ -170,3 +170,6 @@ dist/
 # personal assets folder
 /assets/arts/
 *.mp3
+
+# config files
+config.json
