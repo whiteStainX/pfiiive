@@ -15,22 +15,7 @@ async function main() {
     throw new Error("WebGL2 not available");
   }
 
-  // --- Producer Setup ---
-  let producer =
-    defaultProducer === "three" ? createThreeProducer() : createP5Producer();
-  producer.start();
-
-  function setProducer(kind) {
-    producer.stop();
-    producer = kind === "three" ? createThreeProducer() : createP5Producer();
-    producer.start();
-    resize(); // Ensure sizes are synced
-  }
-
-  window.PFIIIVE = {
-    useP5: () => setProducer("p5"),
-    useThree: () => setProducer("three"),
-  };
+  let producer;
 
   // --- Helpers ---
   function compile(gl, type, src) {
@@ -157,6 +142,23 @@ async function main() {
     loadTexture(gl, "assets/images/allNoise512.png"),
     fetch("config.json").then((res) => res.json()),
   ]);
+
+  // --- Producer Setup ---
+  producer =
+    defaultProducer === "three" ? createThreeProducer({ sketchOptions: params.unknownPleasures || {} }) : createP5Producer();
+  producer.start();
+
+  function setProducer(kind) {
+    producer.stop();
+    producer = kind === "three" ? createThreeProducer({ sketchOptions: params.unknownPleasures || {} }) : createP5Producer();
+    producer.start();
+    resize(); // Ensure sizes are synced
+  }
+
+  window.PFIIIVE = {
+    useP5: () => setProducer("p5"),
+    useThree: () => setProducer("three"),
+  };
 
   const crtProgram = programFromSources(gl, vsSrc, fsSrc);
   const bloomExtractProgram = programFromSources(gl, vsSrc, bloomExtractSrc);

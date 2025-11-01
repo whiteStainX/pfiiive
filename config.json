@@ -18,5 +18,24 @@
   "bloomSoftKnee": 0.5,
   "bloomResolutionScale": 0.4,
   "bloomRadius": 2.5,
-  "bloomAlphaScale": 1.0
+  "bloomAlphaScale": 1.0,
+  "unknownPleasures": {
+    "rows": 69,
+    "cols": 256,
+    "width": 6.0,
+    "lineThickness": 0.05,
+    "gapZ": 0.075,
+    "speed1": 0.28,
+    "speed2": 0.52,
+    "speed3": 0.95,
+    "wavePower": 1.35,
+    "audioUrl": "assets/live.mp3",
+    "fftSize": 512,
+    "smoothing": 0.68,
+    "introSpeed": 0.1,
+    "rowAttack": 0.72,
+    "rowRelease": 0.22,
+    "roughness": 0.065,
+    "autoOrbitSpeed": 0.045
+  }
 }

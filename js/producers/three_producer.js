@@ -1,4 +1,4 @@
-export function createThreeProducer(sketchPath = '../three_sketches/unknown_pleasures_3d.js') {
+export function createThreeProducer({ sketchPath = '../three_sketches/unknown_pleasures_3d.js', sketchOptions = {} } = {}) {
   if (typeof THREE === 'undefined') {
     console.warn('THREE not found. Include three.min.js before using three producer.');
     return null;
@@ -54,7 +54,7 @@ export function createThreeProducer(sketchPath = '../three_sketches/unknown_plea
         .then(module => {
           const createSketch = Object.values(module).find(f => typeof f === 'function');
           if (createSketch) {
-            sketch = createSketch(THREE, renderer, activeCamera);
+            sketch = createSketch(THREE, renderer, activeCamera, sketchOptions);
             if (sketch && sketch.setup) {
               const setupResult = sketch.setup();
               if (setupResult && setupResult.scene) {
